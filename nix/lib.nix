@@ -13,6 +13,12 @@ let
         inherit (spec) sha256;
       }) {};
 
+  pkgs19_10 = import (builtins.fetchGit {
+      name = "nixpkgs-19.09";
+      url = https://github.com/nixos/nixpkgs/;
+      rev = "3a440874c75a667432e4cd0934db5e06297e3533";
+  }) {};
+
   pkgs = iohkNix.pkgs;
   lib = pkgs.lib;
-in lib // { inherit iohkNix pkgs; inherit (iohkNix) nix-tools; }
+in lib // { inherit iohkNix pkgs pkgs19_10; inherit (iohkNix) nix-tools; }
