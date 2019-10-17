@@ -8,7 +8,16 @@ stdenv.mkDerivation {
   name = "issabelleEnv";
 
   buildInputs = [
-    isabelle
+    isabelle perl
+
+    (texlive.combine {
+        inherit (texlive)
+          scheme-small
+
+           # libraries
+            stmaryrd
+        ;
+    })
   ];
 
   src = ./.;
