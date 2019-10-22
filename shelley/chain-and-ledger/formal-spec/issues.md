@@ -1,4 +1,4 @@
-.Questions and Outstanding Issues
+Questions and Outstanding Issues
 
 
 1. Where should I put this?
@@ -8,7 +8,7 @@ of execution-cost issues and when it fails in the usual way?
 
 3. Staking rights of script addresses:
 
-How can one register a script address (using the Deleg-Reg rule)
+- How can one register a script address (using the Deleg-Reg rule)
 to have its own staking credential if this is done by a certificate
 that has to be witnessed (must have an entry in $\fun{txwitsVKey}~ tx$)
 
@@ -34,7 +34,7 @@ obligation).
 7. Should addresses be changed to include the hash and the
 staking credential?
 
-Party paying into the script must provide this credential.
+- Party paying into the script must provide this credential.
 
 8. If in addition to execution cost, a refundable “deposit” will be included
 in the script execution fees,
