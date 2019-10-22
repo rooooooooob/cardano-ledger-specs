@@ -36,6 +36,8 @@ between epochs and slots and one function $\fun{kesPeriod}$ for getting the cycl
       \var{dur} & \Duration & \text{difference between slots}\\
       \var{epoch} & \Epoch & \text{epoch} \\
       \var{kesPeriod} & \KESPeriod & \text{KES period} \\
+      \var{exunits} & \ExUnits & \text{units of script execution} \\
+      \var{costm} & \CostMod & \text{coefficients for cost model} \\
     \end{array}
   \end{equation*}
   %
@@ -66,9 +68,8 @@ between epochs and slots and one function $\fun{kesPeriod}$ for getting the cycl
       \begin{array}{r@{~\in~}lr}
         \var{a} \mapsto \Z & \PParams & \text{min fee factor}\\
         \var{b} \mapsto \Z & \PParams & \text{min fee constant}\\
-        \var{c_{sdep}} \mapsto \Coin & \PParams & \text{deposit cost factor}\\
-        \var{c_{mem}} \mapsto \Coin & \PParams & \text{script exec memory cost factor}\\
-        \var{c_{stps}} \mapsto \Coin & \PParams & \text{script exec steps cost factor}\\
+        \var{c_{sdep}} \mapsto \Coin & \PParams & \text{data script deposit}\\
+        \var{costm} \mapsto \CostMod & \PParams & \text{script exec cost model}\\
         \var{scrExecDep} \mapsto \Coin & \PParams & \text{deposit for script execution}\\
         \var{maxBlockSize} \mapsto \N & \PParams & \text{max block body size}\\
         \var{maxTxSize} \mapsto \N & \PParams & \text{max transaction size}\\
