@@ -111,7 +111,6 @@ This function must produce a unique id for each unique transaction.
       \var{script_v}&\ScriptV & \Script & \text{validator script}\\
       \var{script_d}&\ScriptD & \Data & \text{data script}\\
       \var{script_r}&\ScriptR & \Data & \text{redeemer script}\\
-      \var{txdat}&\PendingTx & \Data & \text{transaction data}\\
     \end{array}
   \end{equation*}
 %
@@ -138,6 +137,11 @@ This function must produce a unique id for each unique transaction.
       & \TxInTx
       & \TxIn \uniondistinct \TxInScr
       & \text{transaction input}
+      \\
+      \var{ptx}
+      & \PendingTxInScript
+      & \TxIn \times (\ScriptHash \times \ScriptHash) \times \Coin
+      & \text{pending Tx script input}
       \\
       (\var{addr}, c)
       & \type{TxOutVK}
@@ -195,7 +199,36 @@ This function must produce a unique id for each unique transaction.
       & \text{update proposal}
     \end{array}
   \end{equation*}
+  \caption{Definitions used in the UTxO transition system}
   \label{fig:defs:utxo-shelley-1}
+\end{figure*}
+
+\begin{figure*}[htb]
+  \emph{PendingTx Types}
+  %
+  \begin{equation*}
+    \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
+      \var{ptxiv}
+      & \PendingTxInV
+      & \TxIn \times \Coin
+      \\
+      \var{ptxis}
+      & \PendingTxInS
+      & \TxIn \times (\HashScr \times \HashDat) \times \Coin
+      \\
+      \var{ptxi}
+      & \PendingTxIn
+      & \PendingTxInV \uniondistinct \PendingTxInS
+      \\
+      \var{ptx}
+      & \PendingTx
+      & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Coin \times
+      \PendingTxInS \times \Slot \times \TxWitness
+      \\
+    \end{array}
+  \end{equation*}
+  \caption{Definitions used to make PendingTx}
+  \label{fig:defs:utxo-pending}
 \end{figure*}
 
 \begin{figure*}[htb]
@@ -208,7 +241,7 @@ This function must produce a unique id for each unique transaction.
       & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
         \times \Coin \times \Slot \times \Wdrl \times \Update
       \\
-      \var{wit} & \TxWitness & (\VKey \mapsto \Sig, \HashScr \mapsto \Script)
+      \var{wit} & \TxWitness & (\VKey \mapsto \Sig)
       \\
       \var{tx}
       & \Tx
@@ -229,11 +262,10 @@ This function must produce a unique id for each unique transaction.
       \fun{txwdrls} & \Tx \to \Wdrl & \text{withdrawals} \\
       \fun{txbody} & \Tx \to \TxBody & \text{transaction body}\\
       \fun{txwitsVKey} & \Tx \to (\VKey \mapsto \Sig) & \text{VKey witnesses} \\
-      \fun{txwitsScript} & \Tx \to (\HashScr \mapsto \Script) & \text{script witnesses}\\
       \fun{txup} & \Tx \to \Update & \text{protocol parameter update}
     \end{array}
   \end{equation*}
-  \caption{Definitions used in the UTxO transition system}
+  \caption{Definitions used in the UTxO transition system, cont.}
   \label{fig:defs:utxo-shelley-2}
 \end{figure*}
 
@@ -241,17 +273,41 @@ This function must produce a unique id for each unique transaction.
   \emph{Abstract Functions}
   %
   \begin{align*}
-    \fun{valScriptUpTo} \in & \Script\to (\Data \times \Data \times \Data \times \N \times \N)
-    \to\Bool & \text{restricted validate script} \\
-    \fun{mkPendingTx} \in & \Tx\to \Data
-     & \text{make a PendingTx} \\
+    \fun{hashScript} \in & \Script\to \HashScr & \text{compute script hash} \\
+    \fun{hashData} \in & \Data \to \HashDat
+    & \text{compute hash of data} \\
+    \fun{toData} \in & \PendingTx\to \Data
+    & \text{encode PendingTx as Data} \\
+  \end{align*}
+  \emph{Helper Functions}
+  %
+  \begin{align*}
+    & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \N \times \N)
+    \to\Bool \\ & \text{restricted validate script} \\~\\
+    & \fun{pendingTxIn} \in \TxInTx \to \Coin \to \PendingTxIn \\
+    & \fun{pendingTxIn}~\var{txin}~\var{c} = \\
+    & \begin{cases}
+          (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
+           & \text{if}~\var{txin} = ((txid,ix),(\var{script_v}, \var{script_r},\wcard)) \in \TxInScr \\
+          (txin,c)
+          & \var{txin} = (txid,ix) \in \TxIn
+      \end{cases}\\
+    & \text{build pending Tx input} \\~\\
+    & \fun{pendingTxInScript} \in \TxInScr \to (\Coin \times \Addr) \to \PendingTxIn \\
+    & \fun{pendingTxInScript}~(txin,(\var{script_v}, \var{script_r},\wcard))~\var{c} = \\
+    &  (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
+    \\ & \text{build pending Tx script input}  \\~\\
+    & \fun{validationData} \in \Tx \to \PendingTxInS \to \PendingTx \\
+    & \fun{validationData}~\var{tx}~\var{ptxis} = \\ & (\{\fun{pendingTxIn}~\var{txin} \middle txin \in \fun{txins}~{tx}\},\{~\var{txout} \middle \var{ix} \mapsto \var{txout} \in \fun{txouts}~{tx}\},
+    \fun{txfee}~{tx},\var{ptxis},\fun{txttl}~{tx},\fun{txwitsVKey}~{tx}) \\
+    & \text{build PendingTx} \\
   \end{align*}
   %
   \emph{Notation}
   %
   \begin{align*}
-    \llbracket \var{script_v} \rrbracket_{\var{exunits}} \var{script_d}~\var{script_r}~\var{txdat}
-    &=& \fun{valScriptUpTo} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{txdat}~
+    \llbracket \var{script_v} \rrbracket_{\var{exunits}} \var{script_d}~\var{script_r}~\var{ptx}
+    &=& \fun{valScriptUpTo} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~
     \var{exunits}
   \end{align*}
   \caption{Script Validation}
