@@ -1,10 +1,11 @@
 Questions and Outstanding Issues
 
 
-1. Where should I put this?
+1. Should I go ahead with native multicurrency and NFT support?
 
 2. Do we want to separate the cases when script validation fails because
-of execution-cost issues and when it fails in the usual way?
+of execution-cost issues and when it fails in the usual way? Besides
+having them result in different errors.
 
 3. Staking rights of script addresses:
 
@@ -42,3 +43,4 @@ the person paying that deposit must provide a refund address also
 (These don’t seem really necessary though).
 
 9. Anything jump out in terms of optimization? (avoid unnecessary filtering of the UTxO, etc)
+
