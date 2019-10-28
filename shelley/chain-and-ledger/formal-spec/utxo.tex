@@ -84,15 +84,21 @@ Registration will be discussed more in Section~\ref{sec:delegation-shelley}.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{txinputs_v} \in \Tx \to \TxIn
+    & \fun{txinputs_v} \in \Tx \to \powerset{\TxIn}
     & \text{tx VK inputs} \\
-    & \fun{txinputs_v} ~tx ~=~ \fun{txinputs} ~tx\cap \TxIn
+    & \fun{txinputs_v} ~tx ~=~ \{ (txid,ix)~\vert~((txid,ix),b) \in
+    \fun{txinputs} ~tx\cap (\TxIn \times \IsFee)\}
     \nextdef
-    & \fun{txinputs_s} \in \Tx \to \TxOutScr
+    & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn}
+    & \text{tx VK inputs used for fees} \\
+    & \fun{txinputs_{vf}} ~tx ~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
+    \fun{txinputs} ~tx\cap (\TxIn \times \IsFee),~\var{isf}\in\ForFee\}
+    \nextdef
+    & \fun{txinputs_s} \in \Tx \to \powerset{\TxOutScr}
     & \text{tx script inputs} \\
     & \fun{txinputs_s} ~tx ~=~ \fun{txinputs} ~tx\cap \TxInScr
     \nextdef
-    & \fun{txouts_s} \in \Tx \to \TxOutScr
+    & \fun{txouts_s} \in \Tx \to \powerset{\TxOutScr}
     & \text{tx script outputs} \\
     & \fun{txouts_s} ~ \var{tx} =
         \left\{
@@ -101,7 +107,7 @@ Registration will be discussed more in Section~\ref{sec:delegation-shelley}.
           \var{txout} \in \TxOutScr
         \right\}
     \nextdef
-    & \fun{txouts_v} \in \Tx \to \TxOutVK
+    & \fun{txouts_v} \in \Tx \to \powerset{\TxOutVK}
     & \text{tx vk outputs} \\
     & \fun{txouts_v} ~ \var{tx} =
       \left\{
@@ -110,16 +116,7 @@ Registration will be discussed more in Section~\ref{sec:delegation-shelley}.
         \var{txout} \in \TxOutVK
       \right\}
     \nextdef
-    & \fun{utxo_v} \in \UTxO \to \TxIn \mapsto \TxOutVK
-    & \text{vk utxo entries} \\
-    & \fun{utxo_v} ~ \var{utxo} =
-        \left\{
-          \var{txin} \mapsto \var{txout} ~\in~ \var{utxo}  ~
-          \middle|
-          \var{txout} \in \TxOutVK
-        \right\}
-    \nextdef
-    & \fun{utxo_s} \in \UTxO \to \TxIn \mapsto \TxOutScr
+    & \fun{utxo_s} \in \UTxO \to \TxIn \mapsto \powerset{\TxOutScr}
     & \text{script utxo entries} \\
     & \fun{utxo_s} ~ \var{utxo} =
         \left\{
@@ -172,7 +169,7 @@ Registration will be discussed more in Section~\ref{sec:delegation-shelley}.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{scriptFee} \in \PParams \to \N \to \N \to \Coin
+    & \fun{scriptFee} \in \PParams \to \ExUnits \to \Coin
     & \text{script spending cost calculation} \\
     & \fun{scriptFee} ~\var{pp}~ \var{exunits} ~=~ \\
     \nextdef
@@ -390,9 +387,11 @@ requests).
     {\{\fun{txinputs_s}~\var{tx}\} ~=~ \\
     \{ (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
       \fun{txinputs_s}~\var{tx} ~\vert~ \\
-      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d},\fun{mkPendingTx}~\var{tx} ~\wedge ~ \\
+      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ \fun{validationData}~\var{utxo}~\var{tx}~
+      (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})
+      ~\wedge ~ \\
       \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v}, \\
-      (a,script_d,\wcard) \in \var{(txid,ix)}\restrictdom\var{utxo} \} \\
+      (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo} \} \\
     }
     {
       \var{pp}
@@ -407,7 +406,7 @@ requests).
       \left(
       \begin{array}{r}
         \varUpdate{\var{(\txins{tx} \subtractdom \var{utxo}) \cup \outs{tx}}}  \\
-        \varUpdate{\var{fees} + \fun{scriptFees}~{pp}~{tx}} \\
+        \varUpdate{\var{fees} + \fun{scriptFees}~\var{pp}~\var{tx}} \\
       \end{array}
       \right) \\
     }
@@ -417,9 +416,11 @@ requests).
     {\neg (\{\fun{txinputs_s}~\var{tx}\} ~=~ \\
     \{ (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
       \fun{txinputs_s}~\var{tx} ~\vert~ \\
-      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d},\fun{mkPendingTx}~\var{tx} ~\wedge ~ \\
+      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ \fun{validationData}~\var{utxo}~\var{tx}~
+      (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})
+      ~\wedge ~ \\
       \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v}, \\
-      (a,script_d,\wcard) \in \var{(txid,ix)}\restrictdom\var{utxo} \})
+      (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo} \})
     }
     {
       \var{pp}
@@ -433,8 +434,8 @@ requests).
       \trans{utxos}{tx}
       \left(
       \begin{array}{r}
-        \varUpdate{\var{\fun{txinputs_v}~{tx} \subtractdom \var{utxo}}}  \\
-        \varUpdate{\var{fees} + \fun{ubalance}~(\fun{utxo_v}~{utxo})} \\
+        \varUpdate{\var{\fun{txinputs_{vf}}~{tx} \subtractdom \var{utxo}}}  \\
+        \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})} \\
       \end{array}
       \right)
     }
@@ -453,6 +454,11 @@ requests).
       & \txins{tx} \subseteq \dom \var{utxo}
       \\
       \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{pp}{stpools}~{tx}
+      \\
+      ~
+      \\
+      \fun{scriptFees}~{pp}~\var{tx} \leq
+      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})
       \\
       ~
       \\

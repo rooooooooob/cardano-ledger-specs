@@ -131,8 +131,8 @@
 \newcommand{\ScriptD}{\type{Script_{d}}}
 \newcommand{\ScriptR}{\type{Script_{r}}}
 \newcommand{\PendingTx}{\type{PendingTx}}
-\newcommand{\PendingTxInV}{\type{PendingTxInS}}
-\newcommand{\PendingTxInS}{\type{PendingTxInV}}
+\newcommand{\PendingTxInV}{\type{PendingTxInV}}
+\newcommand{\PendingTxInS}{\type{PendingTxInS}}
 \newcommand{\PendingTxIn}{\type{PendingTxIn}}
 \newcommand{\MSig}{\type{MSig}}
 \newcommand{\Credential}{\type{Credential}}
@@ -144,6 +144,9 @@
 \newcommand{\Info}{\type{Info}}
 \newcommand{\ExUnits}{\type{ExUnits}}
 \newcommand{\CostMod}{\type{CostMod}}
+\newcommand{\ForFee}{\type{ForFee}}
+\newcommand{\NForFee}{\type{NForFee}}
+\newcommand{\IsFee}{\type{IsFee}}
 \newcommand{\TxOut}{\type{TxOut}}
 \newcommand{\TxOutVK}{\type{TxOutVK}}
 \newcommand{\TxOutScr}{\type{TxOutScr}}
@@ -268,7 +271,7 @@
 
 \begin{document}
 
-\input{frontmatter.tex}
+\input{frontmatter}
 
 \tableofcontents
 \listoffigures
@@ -282,7 +285,6 @@
 \include{transactions}
 
 \include{utxo}
-\include{delegation}
 
 
 \addcontentsline{toc}{section}{References}

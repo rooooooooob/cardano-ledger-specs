@@ -92,12 +92,15 @@ This function must produce a unique id for each unique transaction.
       \var{st} & \SystemTag & \text{system tag}\\
       \var{ih} & \InstallerHash & \text{update data}\\
       \var{exunits} & \ExUnits & \text{units of script execution} \\
+      \var{isf} & \ForFee & \text{tag for inputs intended for script fees} \\
+      \var{isf} & \NForFee & \text{tag for inputs not for script fees} \\
     \end{array}
   \end{equation*}
   \emph{Script types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
+      \var{isf} & \IsFee & \ForFee \uniondistinct \NForFee \\
       \var{dat}
       & \Data
       & \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
@@ -135,12 +138,12 @@ This function must produce a unique id for each unique transaction.
       \\
       \var{txin}
       & \TxInTx
-      & \TxIn \uniondistinct \TxInScr
+      & (\TxIn \times \IsFee) \uniondistinct \TxInScr
       & \text{transaction input}
       \\
       \var{ptx}
-      & \PendingTxInScript
-      & \TxIn \times (\ScriptHash \times \ScriptHash) \times \Coin
+      & \PendingTxInS
+      & \TxIn \times (\HashScr \times \HashScr) \times \Coin
       & \text{pending Tx script input}
       \\
       (\var{addr}, c)
@@ -223,7 +226,7 @@ This function must produce a unique id for each unique transaction.
       \var{ptx}
       & \PendingTx
       & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Coin \times
-      \PendingTxInS \times \Slot \times \TxWitness
+      \PendingTxInS \times (\Slot\times\Slot)
       \\
     \end{array}
   \end{equation*}
@@ -239,7 +242,7 @@ This function must produce a unique id for each unique transaction.
       \var{txbody}
       & \TxBody
       & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-        \times \Coin \times \Slot \times \Wdrl \times \Update
+        \times \Coin \times (\Slot\times\Slot) \times \Wdrl \times \Update
       \\
       \var{wit} & \TxWitness & (\VKey \mapsto \Sig)
       \\
@@ -257,12 +260,14 @@ This function must produce a unique id for each unique transaction.
       \fun{txcerts} & \Tx \to \seqof{\DCert} & \text{delegation certificates} \\
       \fun{txfee} & \Tx \to \Coin & \text{transaction fee} \\
       \fun{txsize} & \Tx \to \Coin & \text{transaction size} \\
-      \fun{scrsize} & \ScriptD \to \Coin & \text{data size} \\
       \fun{txttl} & \Tx \to \Slot & \text{time to live} \\
+      \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
       \fun{txwdrls} & \Tx \to \Wdrl & \text{withdrawals} \\
       \fun{txbody} & \Tx \to \TxBody & \text{transaction body}\\
       \fun{txwitsVKey} & \Tx \to (\VKey \mapsto \Sig) & \text{VKey witnesses} \\
-      \fun{txup} & \Tx \to \Update & \text{protocol parameter update}
+      \fun{txup} & \Tx \to \Update & \text{protocol parameter update} \\
+      \fun{scrsize} & \ScriptD \to \Coin & \text{data size} \\
+      \fun{val} & \TxOut \to \Coin & \text{output value} \\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
@@ -289,17 +294,19 @@ This function must produce a unique id for each unique transaction.
     & \begin{cases}
           (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
            & \text{if}~\var{txin} = ((txid,ix),(\var{script_v}, \var{script_r},\wcard)) \in \TxInScr \\
-          (txin,c)
-          & \var{txin} = (txid,ix) \in \TxIn
+          ((txid,ix),c) & \text{if}
+           \var{txin} = ((txid,ix),\wcard) \in \TxIn \times \IsFee
       \end{cases}\\
     & \text{build pending Tx input} \\~\\
-    & \fun{pendingTxInScript} \in \TxInScr \to (\Coin \times \Addr) \to \PendingTxIn \\
-    & \fun{pendingTxInScript}~(txin,(\var{script_v}, \var{script_r},\wcard))~\var{c} = \\
-    &  (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
-    \\ & \text{build pending Tx script input}  \\~\\
-    & \fun{validationData} \in \Tx \to \PendingTxInS \to \PendingTx \\
-    & \fun{validationData}~\var{tx}~\var{ptxis} = \\ & (\{\fun{pendingTxIn}~\var{txin} \middle txin \in \fun{txins}~{tx}\},\{~\var{txout} \middle \var{ix} \mapsto \var{txout} \in \fun{txouts}~{tx}\},
-    \fun{txfee}~{tx},\var{ptxis},\fun{txttl}~{tx},\fun{txwitsVKey}~{tx}) \\
+    & \fun{mkIns} \in \Tx \to \UTxO \to \powerset{\PendingTxIn} \\
+    & \fun{mkIns}~\var{tx}~\var{utxo} = \\
+    & \{ \fun{pendingTxIn}~\var{txin}~\var{\fun{val}~\var{txout}} ~\vert~ \var{txin} \mapsto \var{txout}
+    \in \fun{txins}~\var{tx} \restrictdom \var{utxo}\} \\
+    & \text{build pending Tx inputs} \\~\\
+    & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInS \to \PendingTx \\
+    & \fun{validationData}~\var{utxo}~\var{tx}~\var{ptxis} = \\ &
+    ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\}, (\fun{txlst}~{tx},
+    \fun{txfee}~{tx}),\var{ptxis},\fun{txttl}~{tx}) \\
     & \text{build PendingTx} \\
   \end{align*}
   %

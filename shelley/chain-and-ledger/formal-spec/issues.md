@@ -7,13 +7,15 @@ Questions and Outstanding Issues
 of execution-cost issues and when it fails in the usual way? Besides
 having them result in different errors.
 
+diff predicate failures
+
 3. Staking rights of script addresses:
 
 - How can one register a script address (using the Deleg-Reg rule)
 to have its own staking credential if this is done by a certificate
 that has to be witnessed (must have an entry in $\fun{txwitsVKey}~ tx$)
 
-4. The validation (runScript?) should be parametrized by `exunits`? 
+4. The validation (runScript?) should be parametrized by `exunits`?
 And return false if these are exceeded?
 
 5. Data script and redeemer script size constraints
@@ -44,3 +46,10 @@ the person paying that deposit must provide a refund address also
 
 9. Anything jump out in terms of optimization? (avoid unnecessary filtering of the UTxO, etc)
 
+10. What does PendingTx really need (e.g. the witnesses - still needed if checked elsewhere?)
+
+11. What should the title/format of this document be. I want to keep everything
+from the ledger spec that is relevant to Plutus changes and explaining things
+relevant to plutus changes in the document for *now*. But I want to make sure it
+is clear this is a separate version, and only the Plutus stuff is due to me
+(everything else - all the ledger spec authors)

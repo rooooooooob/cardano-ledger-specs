@@ -1,5 +1,5 @@
 \hypersetup{
-  pdftitle={A Formal Specification of the Cardano Ledger},
+  pdftitle={Plutus Integration into the Formal Specification of the Cardano Ledger},
   breaklinks=true,
   bookmarks=true,
   colorlinks=false,
@@ -11,36 +11,35 @@
   urlbordercolor={white}
 }
 
-\title{A Formal Specification of the Cardano Ledger}
+\title{Plutus Integration into the Formal Specification of the Cardano Ledger}
 
-\author{Jared Corduan  \\ {\small \texttt{jared.corduan@iohk.io}} \\
-   \and Polina Vinogradova \\ {\small \texttt{polina.vinogradova@iohk.io}} \\
-   \and Matthias G\"udemann  \\ {\small \texttt{matthias.gudemann@iohk.io}}}
+\author{
+   Polina Vinogradova \\ {\small \texttt{polina.vinogradova@iohk.io}} \\
+   }
 
 %\date{}
 
 \maketitle
 
 \begin{abstract}
-This document defines the rules for extending a ledger with transactions.
-The transactions will affect both UTxO and stake delegation.
-It is intended to serve as the specification for random generators of transactions
-which adhere to the rules presented here.
+This document is a modification of the Shelley ledger specification
+(see~\cite{shelley_spec}) to support Plutus.
+It only includes those chapters of the original spec in which the
+rules or types were were modified for the purpose of Plutus
+integration, as well as background notation and type definitions necessary
+for presenting the Plutus-related changes.
+
+This will soon be converted into a stand-alone document once it is more 
+clear how to separate out the Plutus-specific definitions.
 \end{abstract}
 
 \section*{List of Contributors}
 \label{acknowledgements}
 
-Nicol\'as Arqueros,
-Nicholas Clarke,
 Duncan Coutts,
-Ruslan Dudin,
-Sebastien Guillemot,
-Vincent Hanquez,
-Ru Horlick,
-Michael Hueschen,
-Yun Lu,
 Philipp Kant,
-Jean-Christophe Mincke,
-Damian Nadales,
-Nicolas Di Prima.
+Michal Peyton Jones,
+Jann Mueller,
+Jared Corduan,
+Matthias Gudemann,
+Manuel Chakravarty
