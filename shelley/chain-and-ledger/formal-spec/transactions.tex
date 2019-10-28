@@ -305,8 +305,8 @@ This function must produce a unique id for each unique transaction.
     & \text{build pending Tx inputs} \\~\\
     & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInS \to \PendingTx \\
     & \fun{validationData}~\var{utxo}~\var{tx}~\var{ptxis} = \\ &
-    ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\}, (\fun{txlst}~{tx},
-    \fun{txfee}~{tx}),\var{ptxis},\fun{txttl}~{tx}) \\
+    ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\},
+    \fun{txfee}~{tx},\var{ptxis},(\fun{txlst}~{tx},\fun{txttl}~{tx})) \\
     & \text{build PendingTx} \\
   \end{align*}
   %
