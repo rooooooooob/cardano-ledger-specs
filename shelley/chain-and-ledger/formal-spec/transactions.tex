@@ -1,84 +1,73 @@
 \section{Transactions}
 \label{sec:transactions}
 
-Transactions are defined in Figure~\ref{fig:defs:utxo-shelley}.
-A transaction body, $\TxBody$, is made up of seven pieces:
+In Figure \ref{fig:defs:utxo-shelley-1}, we give the transaction types modified
+to support Plutus scripts. These types are consistent with the Shelley ledger
+as much as possible,
+except for the following changes:
 
 \begin{itemize}
-  \item A set of transaction inputs.
-    This derived type identifies an output from a previous transaction.
-    It consists of a transaction id and an index to uniquely identify the output.
-  \item An indexed collection of transaction outputs.
-    The $\TxOut$ type is an address paired with a coin value.
-  \item A list of certificates, which will be explained in detail in
-    Section~\ref{sec:delegation-shelley}.
-  \item A transaction fee. This value will be added to the fee pot and eventually handed out
-    as stake rewards.
-  \item A time to live. A transaction will be deemed invalid if processed after this slot.
-  \item A mapping of reward account withdrawals.  The type $\Wdrl$ is a finite map that maps
-    a reward address to the coin value to be withdrawn. The coin value must be equal
-    to the full value contained in the account. Explicitly stating these values ensures
-    that error messages can be precise about why a transaction is invalid.
-    For reward calculation rules, see Section \ref{sec:reward-overview},
-    and for the rule for collecting rewards, see Section \ref{sec:utxo-trans}.
-  \item Update proposals for protocol parameters and software.
+  \item $\ForFee$ and $\NForFee$: These types are used to sort public key
+  spending inputs in a transaction into those used to pay script validation
+  fees and those not used
+  for fees.
+
+  \item $\Data$: is the type of all arguments passed to the validator script.
+  \item $\ScriptV,~ \ScriptR,~ \ScriptD$: are the types of the validator,
+  redeemer and data scripts.
+
+  \item $\Info$: is the additional information an input in a transaction must
+  have when spending a script output. This includes the validator and redeemer,
+  as well as the resource consumption for validating spending the script output
+  , expressed as $exunits$.
+
+  \item $\TxInScr$: A transaction input spending a script output.
+
+  \item $\TxInTx$: A transaction input (now distinct from the input $\TxIn$ in
+  a UTxO entry). Can be a PK-address spending input or a script-spending input.
+
+  \item $\TxOut,~\TxOutVK,~\TxOutScr$: An arbitrary output type (script or PK),
+  as well as special output types for PK and script outputs. The script output
+  includes a data script.
 \end{itemize}
 
-In the derived types, $\Metadata$ and $\Applications$ are values
-that contain versions of current and next versions of applications.
-The $\ApName$ uniquely identifies a specific kind of application (e.g.
-the wallet), and the associated $\ApVer$ is the specific version of that
-application. The associated $\Metadata$ value gives the \textit{next possible}
-versions of the given application. It is a mapping of system tags to hashes of
-installer binaries, and is needed for the update mechanism.
-The update proposal type $\Update$ is a pair of
+The types for PendingTx are added in Figure \ref{fig:defs:utxo-pending}.
+These roughly match the types currently in the master plutus branch.
+
+In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
 
 \begin{itemize}
-  \item $\PPUpdate$, the protocol parameter upates
-  \item $\AVUpdate$, the updates to Shelley software (applications)
+  \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
+  time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
+  where the first slot is accessed by $\fun{txlst}$
+  \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
+  are included.
+  \item $\fun{scrsize},~\fun{val},~\fun{txlst}$ accessor functions added
 \end{itemize}
 
-The $\PPUpdate$ has to do with changing rules and constants of the ledger
-protocol. The relationship between the rule update procedure and updating the
-node software that implements these rules is outlined in the next section
-(see Section \ref{sec:update}).
+In Figure \ref{fig:defs:functions-valid}, functions used for script validation
+are added. These are summarized below
 
-Note that both of these finite maps are indexed by the hashes of the keys of
-entities proposing the given
-updates, $\KeyHashGen$.
-We use the abstract type $\KeyHashGen$ to represent hashes of genesis
-(public verification) keys, which have type $\VKeyGen$.
-Genesis keys are the keys belonging to the federated
-nodes running the Cardano system currently (also referred to as core nodes).
-The the regular user verification keys are of a type $\VKey$, distinct from the
-genesis key type, $\VKeyGen$. Similarly, the type hashes of these
-are distinct, $\KeyHash$ and $\KeyHashGen$ respectively.
-
-Currently, updates
-can only be proposed and voted on by the owners of the genesis keys.
-The process of decentralization will result in the core nodes gradually giving up
-some of their priviledges and responsibilities to the other system nodes.
-The aim is for these nodes to eventually give them \textit{all} up.
-The intent is that in the future, the update proposal mechanism will
-be decentralized as well, and allow all nodes to participate (but likely
-not as a feature in the Shelley release).
-For more on the decentralization process,
-see \ref{sec:new-epoch-trans}.
-
-A transaction, $\Tx$, consists of:
+\begin{note}
+  I will adjust this to accommodate multisig.
+  Note that I have excluded the native multisig from this document (termporarily,
+  to focus on Plutus). I will
+  bring this up in an upcoming discussion.
+\end{note}
 
 \begin{itemize}
-  \item The transaction body.
-  \item A collection of witnesses, represented as a finite map from payment verification keys
-    to signatures.
+  \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
+  abstract functions.
+  \item $\fun{isf}$ will be a concrete function that sorts transaction inputs into those
+  used to pay for script execution and those that arent.
+  \item $\fun{valScriptUpTo}$ is a script validation function. It takes the
+  validator, redeemer and data scripts, and PendingTx as parameters. It also
+  takes a term of type $\ExUnits$ as a parameter and performs validation
+  \textit{limited by resource use as indicated in} $exunits$.
+  \item The other functions are used to build PendingTx
 \end{itemize}
 
-Additionally, the $\UTxO$ type will be used by the ledger state to store all the
-unspent transaction outputs. It is a finite map from transaction inputs
-to transaction outputs that are available to be spent.
 
-Finally, $\fun{txid}$ computes the transaction id of a given transaction.
-This function must produce a unique id for each unique transaction.
 
 \begin{figure*}[htb]
   \emph{Abstract types}
@@ -92,15 +81,14 @@ This function must produce a unique id for each unique transaction.
       \var{st} & \SystemTag & \text{system tag}\\
       \var{ih} & \InstallerHash & \text{update data}\\
       \var{exunits} & \ExUnits & \text{units of script execution} \\
-      \var{isf} & \ForFee & \text{tag for inputs intended for script fees} \\
-      \var{isf} & \NForFee & \text{tag for inputs not for script fees} \\
+      \var{f} & \ForFee & \text{inputs intended for script fees} \\
+      \var{nf} & \NForFee & \text{inputs not for script fees} \\
     \end{array}
   \end{equation*}
   \emph{Script types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
-      \var{isf} & \IsFee & \ForFee \uniondistinct \NForFee \\
       \var{dat}
       & \Data
       & \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
@@ -138,7 +126,7 @@ This function must produce a unique id for each unique transaction.
       \\
       \var{txin}
       & \TxInTx
-      & (\TxIn \times \IsFee) \uniondistinct \TxInScr
+      & \TxIn \uniondistinct \TxInScr
       & \text{transaction input}
       \\
       \var{ptx}
@@ -287,15 +275,19 @@ This function must produce a unique id for each unique transaction.
   \emph{Helper Functions}
   %
   \begin{align*}
-    & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \N \times \N)
+    & \fun{isf} \in \TxIn \to \ForFee \uniondistinct \NForFee \\
+    & \fun{isf}~\var{(txid,ix)} = \\
+    &\text{calculates whether this input should be used to pay script fees}
+    \\~\\
+    & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \ExUnits)
     \to\Bool \\ & \text{restricted validate script} \\~\\
     & \fun{pendingTxIn} \in \TxInTx \to \Coin \to \PendingTxIn \\
     & \fun{pendingTxIn}~\var{txin}~\var{c} = \\
     & \begin{cases}
           (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
            & \text{if}~\var{txin} = ((txid,ix),(\var{script_v}, \var{script_r},\wcard)) \in \TxInScr \\
-          ((txid,ix),c) & \text{if}
-           \var{txin} = ((txid,ix),\wcard) \in \TxIn \times \IsFee
+          ((txid,ix),c) & \text{if}~
+           \var{txin} = ((txid,ix),\wcard) \in \TxIn
       \end{cases}\\
     & \text{build pending Tx input} \\~\\
     & \fun{mkIns} \in \Tx \to \UTxO \to \powerset{\PendingTxIn} \\
@@ -321,9 +313,5 @@ This function must produce a unique id for each unique transaction.
   \label{fig:defs:functions-valid}
 \end{figure*}
 
-Figure~\ref{fig:defs:functions-txins} shows the helper functions
-$\fun{txinsVKey}$ and $\fun{txinsScript}$ which partition the set of transaction
-inputs of the transaction into those that are locked with a private key and
-those that are locked via a script.
 
 \clearpage

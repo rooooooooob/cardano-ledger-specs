@@ -87,12 +87,14 @@ Registration will be discussed more in Section~\ref{sec:delegation-shelley}.
     & \fun{txinputs_v} \in \Tx \to \powerset{\TxIn}
     & \text{tx VK inputs} \\
     & \fun{txinputs_v} ~tx ~=~ \{ (txid,ix)~\vert~((txid,ix),b) \in
-    \fun{txinputs} ~tx\cap (\TxIn \times \IsFee)\}
+    \fun{txinputs} ~tx\cap \TxIn\}
     \nextdef
-    & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn}
+    & \fun{txinputs_{vf}} \in \Tx \to \UTxO \to \powerset{\TxIn}
     & \text{tx VK inputs used for fees} \\
-    & \fun{txinputs_{vf}} ~tx ~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
-    \fun{txinputs} ~tx\cap (\TxIn \times \IsFee),~\var{isf}\in\ForFee\}
+    & \fun{txinputs_{vf}} ~tx~\var{utxo} ~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
+    \fun{txinputs} ~tx\cap \TxIn, \\
+    & (txid,ix) \mapsto \var{txout} \in (txid,ix) \restrictdom utxo, \\
+    & \fun{isf}~\var{((txid,ix),\fun{val}~\var{txout})}\in\ForFee\}
     \nextdef
     & \fun{txinputs_s} \in \Tx \to \powerset{\TxOutScr}
     & \text{tx script inputs} \\
@@ -384,14 +386,15 @@ requests).
 \begin{figure}[htb]
   \begin{equation}
     \inference[Scripts-Val]
-    {\{\fun{txinputs_s}~\var{tx}\} ~=~ \\
-    \{ (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
-      \fun{txinputs_s}~\var{tx} ~\vert~ \\
-      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ \fun{validationData}~\var{utxo}~\var{tx}~
-      (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})
-      ~\wedge ~ \\
-      \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v}, \\
-      (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo} \} \\
+    {
+    \forall (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
+      \fun{txinputs_s}~\var{tx}, \\
+      (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ (\fun{validationData}~\var{utxo}~\var{tx}~
+      (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})) \\
+      ~\wedge ~
+      \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v} \\
+        \\
     }
     {
       \var{pp}
@@ -413,14 +416,14 @@ requests).
   \end{equation}
   \begin{equation}
     \inference[Scripts-NotVal]
-    {\neg (\{\fun{txinputs_s}~\var{tx}\} ~=~ \\
-    \{ (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
-      \fun{txinputs_s}~\var{tx} ~\vert~ \\
-      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ \fun{validationData}~\var{utxo}~\var{tx}~
-      (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})
-      ~\wedge ~ \\
-      \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v}, \\
-      (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo} \})
+    {\neg (
+    \forall (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
+      \fun{txinputs_s}~\var{tx}, \\
+      (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+      \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ (\fun{validationData}~\var{utxo}~\var{tx}~
+      (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})) \\
+      ~\wedge ~
+      \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v} ) \\
     }
     {
       \var{pp}
@@ -434,8 +437,8 @@ requests).
       \trans{utxos}{tx}
       \left(
       \begin{array}{r}
-        \varUpdate{\var{\fun{txinputs_{vf}}~{tx} \subtractdom \var{utxo}}}  \\
-        \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})} \\
+        \varUpdate{\var{\fun{txinputs_{vf}}~{tx}~{utxo} \subtractdom \var{utxo}}}  \\
+        \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}~{utxo} \restrictdom \var{utxo})} \\
       \end{array}
       \right)
     }
@@ -458,7 +461,7 @@ requests).
       ~
       \\
       \fun{scriptFees}~{pp}~\var{tx} \leq
-      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})
+      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}~{utxo} \restrictdom \var{utxo})
       \\
       ~
       \\

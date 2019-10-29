@@ -3,30 +3,52 @@
 
 The rules for the ledger depend on several parameters contained in the $\PParams$ type,
 defined in \cite{byron_ledger_spec}.
-The parameters are listed in Figure~\ref{fig:defs:protocol-parameters},
-the first ten of which below are common to the Byron era.
-We will explain the significance of each parameter as it comes up in
-the calculations used in transition rules.
+The parameters are listed in Figure~\ref{fig:defs:protocol-parameters}.
 
-The type $\Coin$ is defined as an alias for the integers.
-Negative values will not be allowed in UTxO outputs or reward accounts,
-and $\Z$ is only chosen over $\N$ for its additive inverses.
+For Plutus integration, we have added the following abstract types:
 
-Two global constants are defined, $\SlotsPerEpoch$ and $\SlotsPerKESPeriod$,
-representing the number of slots in an epoch/KES period (for a brief explanation
-of a KES period, see Section \ref{sec:crypto-primitives-shelley}).
-As global constants, these values can only be
-changed by updating the software.
+\begin{itemize}
+\item $\ExUnits$: represents units of execution of
+a Plutus script, i.e. quantifies the resources necessary to type-check
+and validate spending from a script. In the final implementation, this will
+be a vector of specific values, such as the number of $\beta$-reductions performed
+during validation, or the memory requirements for execution of a specific script. \\
+E.g. $\ExUnits = \mathsf{NumBetaReductions} \times \mathsf{MemoryUnits}$.
 
-Some helper functions are defined in Figure~\ref{fig:defs:protocol-parameters-helpers}.
-The $\fun{minfee}$ function calculates the minimum fee that must be paid by a transaction.
-This value depends on the protocol parameters and the size of the transaction.
+\item $\CostMod$: a value of this type will contain coefficients used to calculate,
+given the resource
+consumption due to validating a given script (expressed by a term of type $\ExUnits$),
+an Ada value which will be the fee a transaction must pay for on-chain
+validation of that script.
+In the final implementation this will likely be a vector representing the values
+(in Ada) of consuming a unit of each type of resource in $\ExUnits$.
+Continuing the example above, \\
+$(3,5) \in \CostMod$ \\
+means that 3 Ada is the price of performing one $\beta$-reduction, and
+5 Ada for a unit of memory.
+\end{itemize}
 
-Two time related types are introduced, $\Epoch$ and $\type{Duration}$.
-A $\type{Duration}$ is the difference between two slots, as given by $\slotminus{}{}$.
+\begin{note}
+   I think this is not quite what we discussed but I will have to go over this
+   again later to make sure it is right.
+\end{note}
 
-Lastly, there are two functions, $\fun{epoch}$ and $\fun{firstSlot}$ for converting
-between epochs and slots and one function $\fun{kesPeriod}$ for getting the cycle of a slot.
+We also added the following protocol parameters:
+
+\begin{itemize}
+  \item $\var{c_{sdep}}$: a deposit for storing a data script on-chain in
+  a UTxO. This would be multiplied by the size of the data script to determine
+  the total deposit necessary. This parameter is not currently used.
+
+  \item $\var{costm}$: This is the cost model parameter. It can be updated by
+  the usual protocol parameter update procedure if a decision is made that
+  the value of consuming a unit of a particular resource has changed.
+\end{itemize}
+
+The rest of the parameters, types, and functions in the figures below are copied
+direcly from the ledger spec,
+and used in upcoming transaction validation rules .
+
 
 \begin{figure*}[htb]
   \emph{Abstract types}
@@ -70,7 +92,6 @@ between epochs and slots and one function $\fun{kesPeriod}$ for getting the cycl
         \var{b} \mapsto \Z & \PParams & \text{min fee constant}\\
         \var{c_{sdep}} \mapsto \Coin & \PParams & \text{data script deposit}\\
         \var{costm} \mapsto \CostMod & \PParams & \text{script exec cost model}\\
-        \var{scrExecDep} \mapsto \Coin & \PParams & \text{deposit for script execution}\\
         \var{maxBlockSize} \mapsto \N & \PParams & \text{max block body size}\\
         \var{maxTxSize} \mapsto \N & \PParams & \text{max transaction size}\\
         \var{maxHeaderSize} \mapsto \N & \PParams & \text{max block header size}\\
@@ -98,9 +119,7 @@ between epochs and slots and one function $\fun{kesPeriod}$ for getting the cycl
     \fun{a},
     \fun{b},
     \fun{c_{sdep}},
-    \fun{c_{mem}},
-    \fun{c_{stps}},
-    \fun{scrExecDep},
+    \fun{costm},
     \fun{maxBlockSize},
     \fun{maxTxSize},
     \fun{maxHeaderSize},
