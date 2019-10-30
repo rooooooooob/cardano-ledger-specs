@@ -3,24 +3,40 @@ Questions and Outstanding Issues
 
 1. Should I go ahead with native multicurrency and NFT support?
 
-2. Do we want to separate the cases when script validation fails because
-of execution-cost issues and when it fails in the usual way? Besides
-having them result in different errors.
+- Fees will be paid in Ada only
 
-diff predicate failures
+- Review how best to express the general
+accounting property
 
-3. Staking rights of script addresses:
+2. Suppose we have decided on the protocol for selecting the PK inputs
+that are used for script fees. It returns the set of these PK inputs
+that covers the fees, but has the smallest possible sum total value
+(or some small *enough* value to avoid a full-on subset sum alg).
 
-- How can one register a script address (using the Deleg-Reg rule)
-to have its own staking credential if this is done by a certificate
-that has to be witnessed (must have an entry in $\fun{txwitsVKey}~ tx$)
+- Is this definitely how we want to handle this situation? This still does not
+have the element of the user deliberately being able to dedicate the inputs of
+his/her/wallet's choosing to paying the fees, and I thought this was the
+point of having this type of system.
 
-4. The validation (runScript?) should be parametrized by `exunits`?
-And return false if these are exceeded?
+3. More specific typechecking and script validation functions still need to be added
+to this spec.
 
-5. Data script and redeemer script size constraints
+4. The cost model calculation - is the approach correct here in terms of the
+abstract types used? Is this the model we want to plug in real types into
+later? I.e. the CostMod in protocol parameters and the ExUnits in the transactions.
 
-6. Not immediately clear how collecting the DS deposits would work:
+5. Are we for sure going to have the data script *optionally* stored on-chain?
+
+- That means, the transaction spending the output with that data script
+must provide the data script if it is not stored on the chain.
+
+- This is the change to the model we have agreed on, right?
+
+6. Validation, data script and redeemer script size constraints.
+
+7. In case we decide to require deposits for storing data scripts on-chain:
+
+- Not immediately clear how collecting the DS deposits would work:
 Deposits have to go back to whoever originally paid into the script.
 Transaction spending the data script, and thus triggering a refund,
 does not have access to this info.
@@ -32,24 +48,17 @@ that way
 PP changes affecting refunds etc. from the certificate pool, recalculating
 obligation).
 
-- Should these types of deposits decay?
+- Should these types of deposits decay (differently than other deposits)?
 
-7. Should addresses be changed to include the hash and the
-staking credential?
+7. Still to come in this spec, two cases for validating scripts:
 
-- Party paying into the script must provide this credential.
+- Those that are expected to validate (has validating and non-validating cases)
+- Those that are expected not to validate (also has validating and non-validating cases)
 
-8. If in addition to execution cost, a refundable “deposit” will be included
-in the script execution fees,
-the person paying that deposit must provide a refund address also
-(These don’t seem really necessary though).
+8. Random seed from consensus layer
 
-9. Anything jump out in terms of optimization? (avoid unnecessary filtering of the UTxO, etc)
+- Decided this is not necessary and will disturb deterministic behaviour
 
-10. What does PendingTx really need (e.g. the witnesses - still needed if checked elsewhere?)
+9. Data that makes up PendingTx:
 
-11. What should the title/format of this document be. I want to keep everything
-from the ledger spec that is relevant to Plutus changes and explaining things
-relevant to plutus changes in the document for *now*. But I want to make sure it
-is clear this is a separate version, and only the Plutus stuff is due to me
-(everything else - all the ledger spec authors)
+- are there any changes coming here?

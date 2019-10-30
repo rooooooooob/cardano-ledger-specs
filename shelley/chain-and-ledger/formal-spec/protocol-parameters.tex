@@ -163,33 +163,6 @@ and used in upcoming transaction validation rules .
   \label{fig:defs:protocol-parameters}
 \end{figure*}
 
-\begin{figure*}[htb]
-  \emph{Helper Functions}
-  %
-  \begin{align*}
-    \fun{minfee} & \in \PParams \to \Tx \to \Coin & \text{minimum fee}\\
-    \fun{minfee} & ~\var{pp}~\var{tx} =
-    (\fun{a}~\var{pp}) * \fun{txSize}~\var{tx} + (\fun{b}~\var{pp})
-    \\
-    \\
-    \fun{epoch} & \in ~ \Slot \to \Epoch & \text{epoch of a slot}
-    \\
-    \fun{epoch} & ~\var{slot} = \var{slot}~\mathsf{div}~\SlotsPerEpoch
-    \\
-    \\
-    \fun{firstSlot} & \in ~ \Epoch \to \Slot
-               & \text{first slot of an epoch}
-    \\
-    \fun{firstSlot} & ~\var{e} = \var{e}~\cdot~\SlotsPerEpoch
-    \\
-    \\
-    \fun{kesPeriod} & \in ~ \Slot \to \KESPeriod & \text{KES period of a slot}
-    \\
-    \fun{kesPeriod} & ~\var{slot} = \var{slot}~\mathsf{div}~\SlotsPerKESPeriod
-  \end{align*}
-  %
-  \caption{Helper functions for the Protocol Parameters}
-  \label{fig:defs:protocol-parameters-helpers}
-\end{figure*}
+
 
 \clearpage
