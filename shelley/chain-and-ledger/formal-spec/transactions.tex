@@ -10,21 +10,27 @@ except for the following changes:
   \item $\ForFee$ and $\NForFee$: These types are used to sort public key
   spending inputs in a transaction into those used to pay script validation
   fees and those not used
-  for fees.
+  for fees. $\IsFee$ represents either.
+
+  \item $\ScriptPlutus$ and $\ScriptMSig$ are two types of scripts this spec
+  covers validation of
 
   \item $\Data$: is the type of all arguments passed to the validator script.
+
   \item $\ScriptV,~ \ScriptR,~ \ScriptD$: are the types of the validator,
   redeemer and data scripts.
 
   \item $\Info$: is the additional information an input in a transaction must
   have when spending a script output. This includes the validator and redeemer,
   as well as the resource consumption for validating spending the script output
-  , expressed as $exunits$.
+  , expressed as $\var{exunits}$.
 
   \item $\TxInScr$: A transaction input spending a script output.
 
   \item $\TxInTx$: A transaction input (now distinct from the input $\TxIn$ in
-  a UTxO entry). Can be a PK-address spending input or a script-spending input.
+  a UTxO entry). Can be a PK-address spending input
+  (in which case $\IsFee$ indicates if this input should be used to pay script execution
+  fees), or a script-spending input.
 
   \item $\TxOut,~\TxOutVK,~\TxOutScr$: An arbitrary output type (script or PK),
   as well as special output types for PK and script outputs. The script output
@@ -45,29 +51,39 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\fun{scrsize},~\fun{val},~\fun{txlst}$ accessor functions added
 \end{itemize}
 
-In Figure \ref{fig:defs:functions-valid}, functions used for script validation
-are added. These are summarized below
-
-\begin{note}
-  I will adjust this to accommodate multisig.
-  Note that I have excluded the native multisig from this document (termporarily,
-  to focus on Plutus). I will
-  bring this up in an upcoming discussion.
-\end{note}
+In Figure \ref{fig:defs:functions-helper} are the helper functions used for
+processing transaction data for validation.
 
 \begin{itemize}
   \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
   abstract functions.
-  \item $\fun{isf}$ will be a concrete function that sorts transaction inputs into those
-  used to pay for script execution and those that arent.
-  \item $\fun{valScriptUpTo}$ is a script validation function. It takes the
-  validator, redeemer and data scripts, and PendingTx as parameters. It also
-  takes a term of type $\ExUnits$ as a parameter and performs validation
-  \textit{limited by resource use as indicated in} $exunits$.
-  \item The other functions are used to build PendingTx
+  \item The other functions are needed for building $\PendingTx$
 \end{itemize}
 
+In Figure \ref{fig:defs:functions-valid}, functions for script validation
+are presented.
 
+\begin{itemize}
+  \item $\fun{valMSIG}$ performs validation for multi-sig scripts
+  (this does not require data or redeemer scripts). The abstract $\ExUnits$
+  type can be defined to have a MSIG constructor specifically to
+  measure msig-related resources.
+  \item $\fun{valPLC}$ performs validation for plutus scripts.
+  \begin{note}
+    these need to be defined still
+  \end{note}
+\item $\fun{valScriptUpTo}$ is a script validation function. It takes the
+validator, redeemer and data scripts, and PendingTx as parameters. It also
+takes a term of type $\ExUnits$ as a parameter and performs validation
+\textit{limited by resource use as indicated in} $exunits$.
+\item The other functions are used to build PendingTx
+\end{itemize}
+
+\begin{note}
+  $\fun{valScriptUpTo}$  is the name of the function that replaces
+  $\fun{evaluateScript}$ in the existing multi-sig script validation
+  scheme in the ledger spec.
+\end{note}
 
 \begin{figure*}[htb]
   \emph{Abstract types}
@@ -83,15 +99,18 @@ are added. These are summarized below
       \var{exunits} & \ExUnits & \text{units of script execution} \\
       \var{f} & \ForFee & \text{inputs intended for script fees} \\
       \var{nf} & \NForFee & \text{inputs not for script fees} \\
+      \var{plc} & \ScriptPlutus & \text{Plutus scripts} \\
+      \var{msig} & \ScriptMSig & \text{Multisig scripts} \\
     \end{array}
   \end{equation*}
   \emph{Script types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
+      \var{scr} & \Script & \ScriptPlutus \uniondistinct \ScriptMSig \\
       \var{dat}
       & \Data
-      & \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
+      & \Nothing \uniondistinct \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
         \uniondistinct\seqof{\Data}\uniondistinct\seqof{\Data \times \Data}
       & \text{the $\Data$ type}\\
     \end{array}
@@ -109,6 +128,9 @@ are added. These are summarized below
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
+      \var{isf} & \ForFee \uniondistinct \NForFee
+      & \text {tag for inputs used to pay script fees}
+      \\
       (\var{txid}, \var{ix})
       & \type{TxIn}
       & \TxId \times \Ix
@@ -126,7 +148,7 @@ are added. These are summarized below
       \\
       \var{txin}
       & \TxInTx
-      & \TxIn \uniondistinct \TxInScr
+      & (\TxIn \times \IsFee) \uniondistinct \TxInScr
       & \text{transaction input}
       \\
       \var{ptx}
@@ -254,14 +276,15 @@ are added. These are summarized below
       \fun{txbody} & \Tx \to \TxBody & \text{transaction body}\\
       \fun{txwitsVKey} & \Tx \to (\VKey \mapsto \Sig) & \text{VKey witnesses} \\
       \fun{txup} & \Tx \to \Update & \text{protocol parameter update} \\
-      \fun{scrsize} & \ScriptD \to \Coin & \text{data size} \\
+      \fun{scrsize} & \Script \uniondistinct \Data \to \Coin & \text{data size} \\
       \fun{val} & \TxOut \to \Coin & \text{output value} \\
+      \fun{addr} & \TxOut \to \Addr & \text{output address} \\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
   \label{fig:defs:utxo-shelley-2}
 \end{figure*}
-
+%
 \begin{figure*}[htb]
   \emph{Abstract Functions}
   %
@@ -275,19 +298,13 @@ are added. These are summarized below
   \emph{Helper Functions}
   %
   \begin{align*}
-    & \fun{isf} \in \TxIn \to \ForFee \uniondistinct \NForFee \\
-    & \fun{isf}~\var{(txid,ix)} = \\
-    &\text{calculates whether this input should be used to pay script fees}
-    \\~\\
-    & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \ExUnits)
-    \to\Bool \\ & \text{restricted validate script} \\~\\
     & \fun{pendingTxIn} \in \TxInTx \to \Coin \to \PendingTxIn \\
     & \fun{pendingTxIn}~\var{txin}~\var{c} = \\
     & \begin{cases}
           (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
            & \text{if}~\var{txin} = ((txid,ix),(\var{script_v}, \var{script_r},\wcard)) \in \TxInScr \\
           ((txid,ix),c) & \text{if}~
-           \var{txin} = ((txid,ix),\wcard) \in \TxIn
+           \var{txin} = ((txid,ix),\wcard) \in (\TxIn \times \IsFee)
       \end{cases}\\
     & \text{build pending Tx input} \\~\\
     & \fun{mkIns} \in \Tx \to \UTxO \to \powerset{\PendingTxIn} \\
@@ -301,6 +318,30 @@ are added. These are summarized below
     \fun{txfee}~{tx},\var{ptxis},(\fun{txlst}~{tx},\fun{txttl}~{tx})) \\
     & \text{build PendingTx} \\
   \end{align*}
+  \caption{Script Validation}
+  \label{fig:defs:functions-helper}
+\end{figure*}
+%
+\begin{figure*}[htb]
+  \emph{Script Validation Functions}
+  %
+  \begin{align*}
+    & \fun{valMSIG} \in \ScriptMSig\to \Data \to \ExUnits \to\Bool \\
+    & \text{resource-restricted validation of a multi-sig script} \\~\\
+    & \fun{valPLC} \in \ScriptPlutus\to (\Data \times \Data \times \Data \times
+    \ExUnits) \to \Bool \\
+    & \text{resource-restricted validation of a Plutus script} \\~\\
+    & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \ExUnits)
+    \to\Bool \\
+    & \fun{valScriptUpTo}~\var{} \\
+    &~~= \begin{cases}
+              \fun{valPLC} ~\var{script_v} ~\var{ptx}~\var{exunits}
+               & \text{if}~\var{script_v} \in \ScriptMSig \\
+              \fun{valMSIG} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~\var{exunits} & \text{if}~
+               \var{script_v} \in \ScriptPlutus
+          \end{cases}
+    \\ & \text{restricted validate script} \\~\\
+  \end{align*}
   %
   \emph{Notation}
   %
@@ -309,7 +350,7 @@ are added. These are summarized below
     &=& \fun{valScriptUpTo} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~
     \var{exunits}
   \end{align*}
-  \caption{Script Validation}
+  \caption{Script Validation, cont.}
   \label{fig:defs:functions-valid}
 \end{figure*}
 

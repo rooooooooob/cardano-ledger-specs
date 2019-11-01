@@ -11,7 +11,7 @@ given in Figure \ref{fig:functions:insouts}. These include
 
 \begin{itemize}
   \item Functions to
-sort inputs, outputs and UTxO entries into scrip and non-script.
+sort inputs, outputs and UTxO entries into script and non-script.
 
   \item The function $\fun{txinputs_{vf}}$ returns only the inputs selected to be used
 for paying script execution fees
@@ -47,15 +47,14 @@ The changes due to Plutus integration are as follows:
   \begin{align*}
     & \fun{txinputs_v} \in \Tx \to \powerset{\TxIn}
     & \text{tx VK inputs} \\
-    & \fun{txinputs_v} ~tx ~=~ \{ (txid,ix)~\vert~((txid,ix),b) \in
-    \fun{txinputs} ~tx\cap \TxIn\}
+    & \fun{txinputs_v} ~tx ~=~
+    \fun{txinputs} ~tx\cap (\TxIn\times\IsFee)
     \nextdef
-    & \fun{txinputs_{vf}} \in \Tx \to \UTxO \to \powerset{\TxIn}
+    & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn}
     & \text{tx VK inputs used for fees} \\
-    & \fun{txinputs_{vf}} ~tx~\var{utxo} ~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
-    \fun{txinputs} ~tx\cap \TxIn, \\
-    & (txid,ix) \mapsto \var{txout} \in (txid,ix) \restrictdom utxo, \\
-    & \fun{isf}~\var{((txid,ix),\fun{val}~\var{txout})}\in\ForFee\}
+    & \fun{txinputs_{vf}} ~tx~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
+    \fun{txinputs} ~tx\cap \TxIn,~
+     \var{isf}\in\ForFee\}
     \nextdef
     & \fun{txinputs_s} \in \Tx \to \powerset{\TxOutScr}
     & \text{tx script inputs} \\
@@ -98,8 +97,7 @@ The changes due to Plutus integration are as follows:
         \right\} \\
     \nextdef
     & \fun{txins} \in \Tx \to \powerset{\TxIn} & \text{transaction inputs} \\
-    & \fun{txins} ~\var{tx} = \{(txid,ix) \mid (txid,ix)\in\fun{txinputs_v} ~tx\} \\
-    & ~~\cup \{(txid,ix)\in\fun{txinputs_s}~ tx\} \\
+    & \fun{txins} ~\var{tx} = \{(txid,ix) \mid ((txid,ix),\wcard)\in\fun{txinputs} ~tx\} \\
   \end{align*}
   \caption{Functions on Tx Inputs and Outputs}
   \label{fig:functions:insouts}
@@ -110,8 +108,8 @@ The changes due to Plutus integration are as follows:
   \begin{align*}
     & \fun{ubalance} \in \UTxO \to \Coin
     & \text{UTxO balance} \\
-    & \fun{ubalance} ~ utxo = \sum_{(~\wcard ~ \mapsto (\wcard, ~c)) \in \fun{utxo_v}~\var{utxo}} c \\
-    &~~ + \sum_{(~\wcard ~ \mapsto (\wcard, ~c,\wcard)) \in \fun{utxo_s}~\var{utxo}} c
+    & \fun{ubalance} ~ utxo = \sum_{i\mapsto \var{txout}\in\var{utxo}}
+    \fun{val}~{txout} \\
     \nextdef
     & \fun{wbalance} \in \Wdrl \to \Coin
     & \text{withdrawal balance} \\
@@ -359,8 +357,8 @@ For each of the two rules, the following state changes occur:
       \trans{utxos}{tx}
       \left(
       \begin{array}{r}
-        \varUpdate{\var{\fun{txinputs_{vf}}~{tx}~{utxo} \subtractdom \var{utxo}}}  \\
-        \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}~{utxo} \restrictdom \var{utxo})} \\
+        \varUpdate{\var{\fun{txinputs_{vf}}~{tx} \subtractdom \var{utxo}}}  \\
+        \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}\restrictdom \var{utxo})} \\
       \end{array}
       \right)
     }
@@ -421,7 +419,7 @@ as follows:
       ~
       \\
       \fun{scriptFees}~{pp}~\var{tx} \leq
-      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}~{utxo} \restrictdom \var{utxo})
+      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})
       \\
       ~
       \\
@@ -546,7 +544,7 @@ predicate.
       \powerset{\KeyHash}
     & \text{required key hashes} \\
     &  \hspace{-0.8cm}\fun{witsVKeyNeeded}~\var{utxo}~\var{tx}~\var{dms} = \\
-    & ~~\{ \fun{paymentHK}~a \mid i \mapsto (a, \wcard) \in \var{utxo},~i\in\fun{txinsVKey}~{tx} \} \\
+    & ~~\{ \fun{paymentHK}~\fun{addr}~{txout} \mid i \mapsto \var{txout} \in \var{utxo},~i\in\fun{txinsVKey}~{tx} \} \\
     \cup & ~~
            \{\fun{stakeCred_r}~a\mid a\mapsto \wcard \in \AddrRWDVKey
       \restrictdom \txwdrls{tx}\}\\
