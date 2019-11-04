@@ -12,6 +12,10 @@ except for the following changes:
   fees and those not used
   for fees. $\IsFee$ represents either.
 
+  \item $\ValTag$ and $\InValTag$: These types are used to indicate if a
+  transaction is expected to validate.
+  $\TxValTag$ represents either.
+
   \item $\ScriptPlutus$ and $\ScriptMSig$ are two types of scripts this spec
   covers validation of
 
@@ -46,6 +50,10 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
   where the first slot is accessed by $\fun{txlst}$
+  \item $\TxValTag$ is now part of the $\Tx$ type. This is a tag that is
+  set by the slot leader submitting the block containing this transaction.
+  It can later be used to re-apply blocks without performing script validation
+  again.
   \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
   are included.
   \item $\fun{scrsize},~\fun{val},~\fun{txlst}$ accessor functions added
@@ -101,6 +109,8 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \var{nf} & \NForFee & \text{inputs not for script fees} \\
       \var{plc} & \ScriptPlutus & \text{Plutus scripts} \\
       \var{msig} & \ScriptMSig & \text{Multisig scripts} \\
+      \var{vt} & \InValTag & \text{transaction valid tag} \\
+      \var{ivt} & \ValTag & \text{transaction invalid tag} \\
     \end{array}
   \end{equation*}
   \emph{Script types}
@@ -108,6 +118,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
       \var{scr} & \Script & \ScriptPlutus \uniondistinct \ScriptMSig \\
+      \var{tvtag} & \TxValTag & \ValTag \uniondistinct \InValTag \\
       \var{dat}
       & \Data
       & \Nothing \uniondistinct \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
@@ -258,7 +269,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \\
       \var{tx}
       & \Tx
-      & \TxBody \times \TxWitness
+      & \TxBody \times \TxWitness \times \TxValTag
     \end{array}
   \end{equation*}
   %
@@ -279,6 +290,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \fun{scrsize} & \Script \uniondistinct \Data \to \Coin & \text{data size} \\
       \fun{val} & \TxOut \to \Coin & \text{output value} \\
       \fun{addr} & \TxOut \to \Addr & \text{output address} \\
+      \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}

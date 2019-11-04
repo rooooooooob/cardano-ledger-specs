@@ -261,10 +261,17 @@ transition rules.
 \end{figure}
 
 The rules for the second-phase script validation are given in
-Figure~\ref{fig:rules:utxo-scrval}. There are two transition rules, one of
-which always applies. This is because there is a single predicate in each rule, and
-the predicate for Scripts-NotVal is the negation of the predicate for
-Scripts-Val. This predicate states that, for every script-spending
+Figure~\ref{fig:rules:utxo-scrval}. There are two transition rules.
+The first predicate in each checks the value of the validity tag.
+The first rule applies when all scripts validate in the transaction,
+and the value of the tag must indicate this (it must be $\ValTag$).
+The second rule applies when some script does not validate, so the
+tag for these types of transactions has to be $\InValTag$.
+
+The second predicate in each rule is the script validation.
+Rule (1) applies when all scripts validate, and rule (2) applies when
+some script does not.
+More precisely, the predicate states that, for every script-spending
 transaction input $txin \in \TxInTx$,
 
 \begin{itemize}
@@ -302,11 +309,35 @@ For each of the two rules, the following state changes occur:
   is added to the fee pot.
 \end{itemize}
 
+It is always in the interest of the slot leader to have the new block validate,
+with as many valid transactions as possible. This general heuristic,
+in the case of the UTXOS rule, motivates the
+slot leader to:
+
+\begin{itemize}
+  \item correctly apply of the $\TxValTag$ tag,
+  \item include transactions that validate in every way
+  \textit{except possibly script validation failure}
+  \item exclude any transactions that are invalid
+in some way \textit{other than script validation failure}
+\end{itemize}
+
+The only situation in which nodes may end up using resources to run
+script validation without collecting fees for it is: if a block contains
+a transaction that does not validate in a way other than script validation
+failure. An example of this would be incorrect witnessing of spending
+of PK UTxO entries. As mentioned above, including such a transaction would not be
+in the slot leader's interest and should happen rarely.
+
+Note that the reason for having the correct validation tag added by the slot leader
+to a transaction is that re-applying blocks would not require repeat
+execution of scripts in the transactions inside a block.
 
 \begin{figure}[htb]
   \begin{equation}
     \inference[Scripts-Val]
     {
+    \fun{txvaltag}~\var{tx} \in \ValTag \\~\\
     \forall (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
       \fun{txinputs_s}~\var{tx}, \\
       (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
@@ -336,7 +367,9 @@ For each of the two rules, the following state changes occur:
   \end{equation}
   \begin{equation}
     \inference[Scripts-NotVal]
-    {\neg (
+    {
+    \fun{txvaltag}~\var{tx} \in \InValTag \\~\\
+    \neg (
     \forall (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
       \fun{txinputs_s}~\var{tx}, \\
       (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
@@ -367,8 +400,8 @@ For each of the two rules, the following state changes occur:
   \label{fig:rules:utxo-scrval}
 \end{figure}
 
-In Figure \ref{fig:rules:utxo-shelley}, we present the $\mathsf{UTxO-inductive}$
-transition. It compares to the original rule in the Shelley ledger spec
+In Figure \ref{fig:rules:utxo-shelley}, we present the ${UTxO-inductive}$
+transition rule. It compares to the original rule in the Shelley ledger spec
 as follows. The preconditions remain the same, with two additions:
 
 \begin{itemize}
@@ -381,7 +414,7 @@ as follows. The preconditions remain the same, with two additions:
 \end{itemize}
 
 Note that the types and rules for the UP transition (which is one of the
-pre-conditions in the are $\mathsf{UTxO-inductive}$ rule) are not included
+pre-conditions in the are $UTxO-inductive$ rule) are not included
 in this document as there is no change there due to Plutus integration.
 The state change in the consequent this rule compares to the Shelley spec
 as follows:
