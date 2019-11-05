@@ -266,7 +266,9 @@ The first predicate in each checks the value of the validity tag.
 The first rule applies when all scripts validate in the transaction,
 and the value of the tag must indicate this (it must be $\ValTag$).
 The second rule applies when some script does not validate, so the
-tag for these types of transactions has to be $\InValTag$.
+tag for these types of transactions has to be $\InValTag$. We want to
+throw away all the blocks which have transactions with these tags
+applied incorrectly.
 
 The second predicate in each rule is the script validation.
 Rule (1) applies when all scripts validate, and rule (2) applies when
@@ -338,13 +340,13 @@ execution of scripts in the transactions inside a block.
     \inference[Scripts-Val]
     {
     \fun{txvaltag}~\var{tx} \in \ValTag \\~\\
-    \forall (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
-      \fun{txinputs_s}~\var{tx}, \\
+    \forall (txid,ix,(\var{hashscr_v},\var{script_r},\var{exunits})) \in
+      \fun{txinputs_s}~\var{tx}, \var{sh}\in \var{hashscr_v}\restrictdom\fun{txvals}~{tx} \\
       (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
       \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ (\fun{validationData}~\var{utxo}~\var{tx}~
       (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})) \\
       ~\wedge ~
-      \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v} \\
+      \var{sh} = \fun{validatorHash}~\var{a} \mapsto \var{script_v}  \\
         \\
     }
     {
@@ -370,13 +372,13 @@ execution of scripts in the transactions inside a block.
     {
     \fun{txvaltag}~\var{tx} \in \InValTag \\~\\
     \neg (
-    \forall (txid,ix,(\var{script_v},\var{script_r},\var{exunits})) \in
-      \fun{txinputs_s}~\var{tx}, \\
+    \forall (txid,ix,(\var{hashscr_v},\var{script_r},\var{exunits})) \in
+      \fun{txinputs_s}~\var{tx}, \var{sh}\in \var{hashscr_v}\restrictdom\fun{txvals}~{tx} \\
       (txid,ix) \mapsto ((a,c),script_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
       \llbracket \var{script_v} \rrbracket_{exunits} \var{script_r},\var{script_d}, \\ (\fun{validationData}~\var{utxo}~\var{tx}~
       (\fun{pendingTxIn}~\var{(txid,ix,(\var{script_v},\var{script_r},\var{exunits}))}~\var{c})) \\
       ~\wedge ~
-      \fun{validatorHash}~\var{a} = \fun{scriptHash}~\var{script_v} ) \\
+      \var{sh} = \fun{validatorHash}~\var{a} \mapsto \var{script_v} ) \\
     }
     {
       \var{pp}

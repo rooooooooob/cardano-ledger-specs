@@ -8,15 +8,6 @@ Questions and Outstanding Issues
 - Review how best to express the general
 accounting property
 
-2. Suppose we have decided on the protocol for selecting the PK inputs
-that are used for script fees. It returns the set of these PK inputs
-that covers the fees, but has the smallest possible sum total value
-(or some small *enough* value to avoid a full-on subset sum alg).
-
-- Is this definitely how we want to handle this situation? This still does not
-have the element of the user deliberately being able to dedicate the inputs of
-his/her/wallet's choosing to paying the fees, and I thought this was the
-point of having this type of system.
 
 3. More specific typechecking and script validation functions still need to be added
 to this spec.

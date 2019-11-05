@@ -147,9 +147,9 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       & \TxId \times \Ix
       & \text{UTxO entry reference}
       \\
-      \var{(\var{script_v}, \var{script_r},\var{exunits})}
+      \var{(\var{hashscr_v}, \var{script_r},\var{exunits})}
       & \Info
-      & \ScriptV \times \ScriptR \times \ExUnits
+      & \HashScr \times \ScriptR \times \ExUnits
       & \text{validation data}
       \\
       (\var{txid}, \var{ix}, \var{inf})
@@ -258,13 +258,16 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
 \begin{figure*}[htb]
   \emph{Transaction Types}
   %
+  \begin{align*}
+    \var{txbody} ~\in~
+    & \TxBody ~=~
+    & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
+      \times \Coin \times (\Slot\times\Slot) \\
+    &~& \times (\HashScr \mapsto \Script) \times \Wdrl \times \Update 
+  \end{align*}
+  %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{txbody}
-      & \TxBody
-      & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-        \times \Coin \times (\Slot\times\Slot) \times \Wdrl \times \Update
-      \\
       \var{wit} & \TxWitness & (\VKey \mapsto \Sig)
       \\
       \var{tx}
@@ -291,6 +294,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \fun{val} & \TxOut \to \Coin & \text{output value} \\
       \fun{addr} & \TxOut \to \Addr & \text{output address} \\
       \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
+      \fun{txvals} & \Tx \to (\HashScr \mapsto \Script) & \text{validator scripts}\\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
@@ -313,8 +317,8 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     & \fun{pendingTxIn} \in \TxInTx \to \Coin \to \PendingTxIn \\
     & \fun{pendingTxIn}~\var{txin}~\var{c} = \\
     & \begin{cases}
-          (txin,\fun{hashScript}~{script_v},\fun{hashData}~{script_v},c)
-           & \text{if}~\var{txin} = ((txid,ix),(\var{script_v}, \var{script_r},\wcard)) \in \TxInScr \\
+          (txin,~{hashscr_v},\fun{hashData}~{script_r},c)
+           & \text{if}~\var{txin} = ((txid,ix),(\var{hashscr_v}, \var{script_r},\wcard)) \in \TxInScr \\
           ((txid,ix),c) & \text{if}~
            \var{txin} = ((txid,ix),\wcard) \in (\TxIn \times \IsFee)
       \end{cases}\\
@@ -345,11 +349,11 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     & \text{resource-restricted validation of a Plutus script} \\~\\
     & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \ExUnits)
     \to\Bool \\
-    & \fun{valScriptUpTo}~\var{} \\
+    & \fun{valScriptUpTo}~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~\var{exunits} \\
     &~~= \begin{cases}
-              \fun{valPLC} ~\var{script_v} ~\var{ptx}~\var{exunits}
+              \fun{valMSIG} ~\var{script_v} ~\var{ptx}~\var{exunits}
                & \text{if}~\var{script_v} \in \ScriptMSig \\
-              \fun{valMSIG} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~\var{exunits} & \text{if}~
+              \fun{valPLC} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~\var{exunits} & \text{if}~
                \var{script_v} \in \ScriptPlutus
           \end{cases}
     \\ & \text{restricted validate script} \\~\\
