@@ -8,6 +8,16 @@ Questions and Outstanding Issues
 - Review how best to express the general
 accounting property
 
+2. Should the reward calculation take into account *only* Ada tokens
+associated with staking credentials? This also includes pool pledges,
+parameters, and anything else to do with rewards, etc. Essentially,
+the only place other tokens should appear are in the general accounting
+property, transaction inputs and outputs, and UTxO.
+
+3. To avoid more than one copy of the validator, there is a hash lookup
+Map in the transaction. Should we do this also for the redeemer and data?
+Since these are smaller (perhaps smaller than their own hashes), this
+may not be a good idea?
 
 3. More specific typechecking and script validation functions still need to be added
 to this spec.

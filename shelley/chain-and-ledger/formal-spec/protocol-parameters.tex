@@ -43,6 +43,8 @@ We also added the following protocol parameters:
   \item $\var{costm}$: This is the cost model parameter. It can be updated by
   the usual protocol parameter update procedure if a decision is made that
   the value of consuming a unit of a particular resource has changed.
+
+  \item $\var{maxunits}$: The maximum allowed script execution resource use.
 \end{itemize}
 
 The rest of the parameters, types, and functions in the figures below are copied
@@ -92,6 +94,7 @@ and used in upcoming transaction validation rules .
         \var{b} \mapsto \Z & \PParams & \text{min fee constant}\\
         \var{c_{sdep}} \mapsto \Coin & \PParams & \text{data script deposit}\\
         \var{costm} \mapsto \CostMod & \PParams & \text{script exec cost model}\\
+        \var{maxunits} \mapsto \ExUnits & \PParams & \text{script exec resource use limit}\\
         \var{maxBlockSize} \mapsto \N & \PParams & \text{max block body size}\\
         \var{maxTxSize} \mapsto \N & \PParams & \text{max transaction size}\\
         \var{maxHeaderSize} \mapsto \N & \PParams & \text{max block header size}\\

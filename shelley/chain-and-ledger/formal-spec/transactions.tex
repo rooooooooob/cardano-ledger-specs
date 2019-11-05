@@ -49,14 +49,16 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
 \begin{itemize}
   \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
-  where the first slot is accessed by $\fun{txlst}$
+  where the first slot is accessed by $\fun{txlst}$. The body now also includes
+  a finite map lookup $\HashScr \mapsto \Script$ to avoid having multiple
+  copies of the validator (one for each input spending from that script)
   \item $\TxValTag$ is now part of the $\Tx$ type. This is a tag that is
   set by the slot leader submitting the block containing this transaction.
   It can later be used to re-apply blocks without performing script validation
   again.
   \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
   are included.
-  \item $\fun{scrsize},~\fun{val},~\fun{txlst}$ accessor functions added
+  \item $\fun{scrsize},~\fun{val},~\fun{txlst},~\fun{txvals}$ accessor functions added
 \end{itemize}
 
 In Figure \ref{fig:defs:functions-helper} are the helper functions used for
@@ -263,7 +265,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
       \times \Coin \times (\Slot\times\Slot) \\
-    &~& \times (\HashScr \mapsto \Script) \times \Wdrl \times \Update 
+    &~& \times (\HashScr \mapsto \Script) \times \Wdrl \times \Update
   \end{align*}
   %
   \begin{equation*}

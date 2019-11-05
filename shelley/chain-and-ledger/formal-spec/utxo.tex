@@ -277,7 +277,7 @@ More precisely, the predicate states that, for every script-spending
 transaction input $txin \in \TxInTx$,
 
 \begin{itemize}
-\item Applying the validator provided by this transaction input
+\item Applying the validator associated with this transaction input
 to the data script stored in the corresponding UTxO entry and the redeemer
 script (again, provided in the transaction input), as well as the PendingTx
 constructed by the $\fun{validationData}$ function, returns $\mathsf{True}$.
