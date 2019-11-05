@@ -41,11 +41,6 @@ obligation).
 
 - Should these types of deposits decay (differently than other deposits)?
 
-7. Still to come in this spec, two cases for validating scripts:
-
-- Those that are expected to validate (has validating and non-validating cases)
-- Those that are expected not to validate (also has validating and non-validating cases)
-
 8. Random seed from consensus layer
 
 - Decided this is not necessary and will disturb deterministic behaviour
