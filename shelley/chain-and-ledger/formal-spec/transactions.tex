@@ -103,6 +103,10 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \var{gkey} & \VKeyGen & \text{genesis public keys}\\
       \var{gkh} & \KeyHashGen & \text{genesis key hash}\\
       \var{txid} & \TxId & \text{transaction id}\\
+      \var{c} & \Coin & \text{Ada value}\\
+      \var{curid} & \CurrencyId & \text{currency id}\\
+      \var{tok} & \Token & \text{token identifier}\\
+      \var{quan} & \Quantity & \text{quantity of a token}\\
       \var{an} & \ApName & \text{application name}\\
       \var{st} & \SystemTag & \text{system tag}\\
       \var{ih} & \InstallerHash & \text{update data}\\
@@ -141,6 +145,10 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
+      \var{val} & \Value
+      & \CurrencyId \mapsto (\Token \mapsto \Quantity)
+      & \text{a collection of tokens}
+      \\
       \var{isf} & \ForFee \uniondistinct \NForFee
       & \text {tag for inputs used to pay script fees}
       \\
@@ -166,12 +174,12 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \\
       \var{ptx}
       & \PendingTxInS
-      & \TxIn \times (\HashScr \times \HashScr) \times \Coin
+      & \TxIn \times (\HashScr \times \HashScr) \times \Value
       & \text{pending Tx script input}
       \\
       (\var{addr}, c)
       & \type{TxOutVK}
-      & \Addr \times \Coin
+      & \Addr \times \Value
       & \text{vk address output}
       \\
       (\var{addr}, c)
@@ -236,11 +244,11 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
       \var{ptxiv}
       & \PendingTxInV
-      & \TxIn \times \Coin
+      & \TxIn \times \Value
       \\
       \var{ptxis}
       & \PendingTxInS
-      & \TxIn \times (\HashScr \times \HashDat) \times \Coin
+      & \TxIn \times (\HashScr \times \HashDat) \times \Value
       \\
       \var{ptxi}
       & \PendingTxIn
@@ -248,7 +256,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \\
       \var{ptx}
       & \PendingTx
-      & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Coin \times
+      & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Value \times
       \PendingTxInS \times (\Slot\times\Slot)
       \\
     \end{array}
@@ -264,7 +272,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Coin \times (\Slot\times\Slot) \\
+      \times \Value \times (\Slot\times\Slot) \\
     &~& \times (\HashScr \mapsto \Script) \times \Wdrl \times \Update
   \end{align*}
   %
@@ -285,15 +293,15 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \fun{txouts} & \Tx \to (\Ix \mapsto \TxOut) & \text{transaction outputs} \\
       \fun{txcerts} & \Tx \to \seqof{\DCert} & \text{delegation certificates} \\
       \fun{txfee} & \Tx \to \Coin & \text{transaction fee} \\
-      \fun{txsize} & \Tx \to \Coin & \text{transaction size} \\
+      \fun{txsize} & \Tx \to \N & \text{transaction size} \\
       \fun{txttl} & \Tx \to \Slot & \text{time to live} \\
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
       \fun{txwdrls} & \Tx \to \Wdrl & \text{withdrawals} \\
       \fun{txbody} & \Tx \to \TxBody & \text{transaction body}\\
       \fun{txwitsVKey} & \Tx \to (\VKey \mapsto \Sig) & \text{VKey witnesses} \\
       \fun{txup} & \Tx \to \Update & \text{protocol parameter update} \\
-      \fun{scrsize} & \Script \uniondistinct \Data \to \Coin & \text{data size} \\
-      \fun{val} & \TxOut \to \Coin & \text{output value} \\
+      \fun{scrsize} & \Script \uniondistinct \Data \to \N & \text{data size} \\
+      \fun{val} & \TxOut \to \Value & \text{output value} \\
       \fun{addr} & \TxOut \to \Addr & \text{output address} \\
       \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
       \fun{txvals} & \Tx \to (\HashScr \mapsto \Script) & \text{validator scripts}\\
