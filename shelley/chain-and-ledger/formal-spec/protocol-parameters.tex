@@ -9,11 +9,15 @@ For Plutus integration, we have added the following abstract types:
 
 \begin{itemize}
 \item $\ExUnits$: represents units of execution of
-a Plutus script, i.e. quantifies the resources necessary to type-check
+a script, i.e. quantifies the resources necessary to type-check
 and validate spending from a script. In the final implementation, this will
 be a vector of specific values, such as the number of $\beta$-reductions performed
 during validation, or the memory requirements for execution of a specific script. \\
-E.g. $\ExUnits = \mathsf{NumBetaReductions} \times \mathsf{MemoryUnits}$.
+E.g. $\ExUnits = \mathsf{NumBetaReductions} \times \mathsf{MemoryUnits}$. \\~\\
+Note that we may have different constructors for plutus script execution cost
+parameters and other script execution cost parameters. For example, for
+multi-sig, we may want to use the size of the list of witnesses to
+choose from.
 
 \item $\CostMod$: a value of this type will contain coefficients used to calculate,
 given the resource
@@ -25,7 +29,8 @@ In the final implementation this will likely be a vector representing the values
 Continuing the example above, \\
 $(3,5) \in \CostMod$ \\
 means that 3 Ada is the price of performing one $\beta$-reduction, and
-5 Ada for a unit of memory.
+5 Ada for a unit of memory. \\~\\
+Here we must match the different types of execution costs represented by $\ExUnits$
 \end{itemize}
 
 \begin{note}
@@ -36,10 +41,6 @@ means that 3 Ada is the price of performing one $\beta$-reduction, and
 We also added the following protocol parameters:
 
 \begin{itemize}
-  \item $\var{c_{sdep}}$: a deposit for storing a data script on-chain in
-  a UTxO. This would be multiplied by the size of the data script to determine
-  the total deposit necessary. This parameter is not currently used.
-
   \item $\var{costm}$: This is the cost model parameter. It can be updated by
   the usual protocol parameter update procedure if a decision is made that
   the value of consuming a unit of a particular resource has changed.
@@ -47,42 +48,14 @@ We also added the following protocol parameters:
   \item $\var{maxunits}$: The maximum allowed script execution resource use.
 \end{itemize}
 
-The rest of the parameters, types, and functions in the figures below are copied
-direcly from the ledger spec,
-and used in upcoming transaction validation rules .
-
 
 \begin{figure*}[htb]
   \emph{Abstract types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \var{dur} & \Duration & \text{difference between slots}\\
-      \var{epoch} & \Epoch & \text{epoch} \\
-      \var{kesPeriod} & \KESPeriod & \text{KES period} \\
       \var{exunits} & \ExUnits & \text{units of script execution} \\
       \var{costm} & \CostMod & \text{coefficients for cost model} \\
-    \end{array}
-  \end{equation*}
-  %
-  \emph{Derived types}
-  %
-  \begin{equation*}
-    \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
-      \var{pp}
-      & \PParams
-      & \Ppm \mapsto \Value
-      & \text{protocol parameter map}
-      \\
-      \var{coin}
-      & \Coin
-      & \Z
-      & \text{unit of value}
-      \\
-      \var{pv}
-      & \ProtVer
-      & \N\times\N\times\N
-      & \text{protocol version}
     \end{array}
   \end{equation*}
   %
@@ -90,82 +63,37 @@ and used in upcoming transaction validation rules .
   %
   \begin{equation*}
       \begin{array}{r@{~\in~}lr}
-        \var{a} \mapsto \Z & \PParams & \text{min fee factor}\\
-        \var{b} \mapsto \Z & \PParams & \text{min fee constant}\\
-        \var{c_{sdep}} \mapsto \Coin & \PParams & \text{data script deposit}\\
         \var{costm} \mapsto \CostMod & \PParams & \text{script exec cost model}\\
         \var{maxunits} \mapsto \ExUnits & \PParams & \text{script exec resource use limit}\\
-        \var{maxBlockSize} \mapsto \N & \PParams & \text{max block body size}\\
-        \var{maxTxSize} \mapsto \N & \PParams & \text{max transaction size}\\
-        \var{maxHeaderSize} \mapsto \N & \PParams & \text{max block header size}\\
-        \var{keyDeposit} \mapsto \Coin & \PParams & \text{stake credential deposit}\\
-        \var{keyMinRefund} \mapsto \unitInterval & \PParams & \text{stake credential min refund}\\
-        \var{keyDecayRate} \mapsto \nonnegReals & \PParams & \text{stake credential decay rate}\\
-        \var{poolDeposit} \mapsto \Coin & \PParams & \text{stake pool deposit}\\
-        \var{poolMinRefund} \mapsto \unitInterval & \PParams & \text{stake pool min refund}\\
-        \var{poolDecayRate} \mapsto \nonnegReals & \PParams & \text{stake pool decay rate}\\
-        \var{E_{max}} \mapsto \Epoch & \PParams & \text{epoch bound on pool retirement}\\
-        \var{n_{opt}} \mapsto \Npos & \PParams & \text{desired number of pools}\\
-        \var{a_0} \mapsto \posReals & \PParams & \text{pool influence}\\
-        \tau \mapsto \unitInterval & \PParams & \text{treasury expansion}\\
-        \rho \mapsto \unitInterval & \PParams & \text{monetary expansion}\\
-        \var{activeSlotCoeff} \mapsto \unitInterval & \PParams & f\text{ in \cite{ouroboros_praos}}\\
-        \var{d} \mapsto \{0,~0.1,~0.2,~\ldots,~1\} & \PParams & \text{decentralization parameter}\\
-        \var{extraEntropy} \mapsto \Seed & \PParams & \text{extra entropy}\\
-        \var{pv} \mapsto \ProtVer & \PParams & \text{protocol version}\\
       \end{array}
   \end{equation*}
   %
   \emph{Accessor Functions}
   %
   \begin{center}
-    \fun{a},
-    \fun{b},
-    \fun{c_{sdep}},
     \fun{costm},
-    \fun{maxBlockSize},
-    \fun{maxTxSize},
-    \fun{maxHeaderSize},
-    \fun{keyDeposit},
-    \fun{keyMinRefund},
-    \fun{keyDecayRate},
-    \fun{poolDeposit},
-    \fun{poolMinRefund},
-    \fun{poolDecayRate},
-    \fun{emax},
-    \fun{nopt},
-    \fun{influence},
-    \fun{tau},
-    \fun{rho},
-    \fun{activeSlotCoeff},
-    \fun{d},
-    \fun{extraEntropy},
-    \fun{pv}
+    \fun{maxUnits}
   \end{center}
-  %
-  \emph{Abstract Functions}
-  %
-  \begin{equation*}
-    \begin{array}{r@{~\in~}lr}
-      (\slotminus{}{}) & \Slot \to \Slot \to \Duration
-                       & \text{duration between slots}
-    \end{array}
-  \end{equation*}
-  %
-  \emph{Global Constants}
-  %
-  \begin{equation*}
-    \begin{array}{r@{~\in~}lr}
-      \SlotsPerEpoch & \N & \text{slots per epoch} \\
-      \SlotsPerKESPeriod & \N & \text{slots per KES period} \\
-      \SlotsStabilityParam & \N & \text{stability parameter}
-    \end{array}
-  \end{equation*}
   %
   \caption{Definitions Used in Protocol Parameters}
   \label{fig:defs:protocol-parameters}
 \end{figure*}
 
+In Figure \ref{fig:defs:protocol-parameters-helpers}, we have updated the
+transaction minimum fee to include all the script validation fees it must pay. 
 
+\begin{figure*}[htb]
+  \emph{Helper Functions}
+  %
+  \begin{align*}
+    \fun{minfee} & \in \PParams \to \Tx \to \Coin & \text{minimum fee}\\
+    \fun{minfee} & ~\var{pp}~\var{tx} =
+    (\fun{a}~\var{pp}) \cdot \fun{txSize}~\var{tx} + (\fun{b}~\var{pp})
+    + (\fun{scriptFees}~{pp}~\var{tx})
+  \end{align*}
+  %
+  \caption{Helper functions for the Protocol Parameters}
+  \label{fig:defs:protocol-parameters-helpers}
+\end{figure*}
 
 \clearpage

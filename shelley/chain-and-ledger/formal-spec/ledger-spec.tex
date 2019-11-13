@@ -143,7 +143,9 @@
 \newcommand{\Credential}{\type{Credential}}
 \newcommand{\CurrencyId}{\type{CurrencyId}}
 \newcommand{\Token}{\type{Token}}
-\newcommand{\Quantity}{\type{Token}}
+\newcommand{\Quantity}{\type{Quantity}}
+\newcommand{\QuantityPM}{\type{Quantity}^{\pm}}
+\newcommand{\ValuePM}{\type{Value}^{\pm}}
 
 %% Adding witnesses
 \newcommand{\TxIn}{\type{TxIn}}
@@ -286,13 +288,15 @@
 
 \include{notation}
 
-\include{address}
-
 \include{protocol-parameters}
 
 \include{transactions}
 
 \include{utxo}
+
+\include{ledger}
+
+\include{epoch}
 
 
 \addcontentsline{toc}{section}{References}

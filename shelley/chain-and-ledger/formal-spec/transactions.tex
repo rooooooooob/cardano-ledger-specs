@@ -24,8 +24,12 @@ except for the following changes:
   \item $\ScriptV,~ \ScriptR,~ \ScriptD$: are the types of the validator,
   redeemer and data scripts.
 
+  \item $\Value$ and $\ValuePM$ are multicurrency types used to represent
+  both fungible and non fungible tokens
+
   \item $\Info$: is the additional information an input in a transaction must
-  have when spending a script output. This includes the validator and redeemer,
+  have when spending a script output. This includes the validator, redeemer,
+  data script,
   as well as the resource consumption for validating spending the script output
   , expressed as $\var{exunits}$.
 
@@ -38,78 +42,20 @@ except for the following changes:
 
   \item $\TxOut,~\TxOutVK,~\TxOutScr$: An arbitrary output type (script or PK),
   as well as special output types for PK and script outputs. The script output
-  includes a data script.
+  includes a data script hash.
 \end{itemize}
 
-The types for PendingTx are added in Figure \ref{fig:defs:utxo-pending}.
-These roughly match the types currently in the master plutus branch.
-
-In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
-
-\begin{itemize}
-  \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
-  time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
-  where the first slot is accessed by $\fun{txlst}$. The body now also includes
-  a finite map lookup $\HashScr \mapsto \Script$ to avoid having multiple
-  copies of the validator (one for each input spending from that script)
-  \item $\TxValTag$ is now part of the $\Tx$ type. This is a tag that is
-  set by the slot leader submitting the block containing this transaction.
-  It can later be used to re-apply blocks without performing script validation
-  again.
-  \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
-  are included.
-  \item $\fun{scrsize},~\fun{val},~\fun{txlst},~\fun{txvals}$ accessor functions added
-\end{itemize}
-
-In Figure \ref{fig:defs:functions-helper} are the helper functions used for
-processing transaction data for validation.
-
-\begin{itemize}
-  \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
-  abstract functions.
-  \item The other functions are needed for building $\PendingTx$
-\end{itemize}
-
-In Figure \ref{fig:defs:functions-valid}, functions for script validation
-are presented.
-
-\begin{itemize}
-  \item $\fun{valMSIG}$ performs validation for multi-sig scripts
-  (this does not require data or redeemer scripts). The abstract $\ExUnits$
-  type can be defined to have a MSIG constructor specifically to
-  measure msig-related resources.
-  \item $\fun{valPLC}$ performs validation for plutus scripts.
-  \begin{note}
-    these need to be defined still
-  \end{note}
-\item $\fun{valScriptUpTo}$ is a script validation function. It takes the
-validator, redeemer and data scripts, and PendingTx as parameters. It also
-takes a term of type $\ExUnits$ as a parameter and performs validation
-\textit{limited by resource use as indicated in} $exunits$.
-\item The other functions are used to build PendingTx
-\end{itemize}
-
-\begin{note}
-  $\fun{valScriptUpTo}$  is the name of the function that replaces
-  $\fun{evaluateScript}$ in the existing multi-sig script validation
-  scheme in the ledger spec.
-\end{note}
 
 \begin{figure*}[htb]
   \emph{Abstract types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \var{gkey} & \VKeyGen & \text{genesis public keys}\\
-      \var{gkh} & \KeyHashGen & \text{genesis key hash}\\
-      \var{txid} & \TxId & \text{transaction id}\\
       \var{c} & \Coin & \text{Ada value}\\
       \var{curid} & \CurrencyId & \text{currency id}\\
       \var{tok} & \Token & \text{token identifier}\\
-      \var{quan} & \Quantity & \text{quantity of a token}\\
-      \var{an} & \ApName & \text{application name}\\
-      \var{st} & \SystemTag & \text{system tag}\\
-      \var{ih} & \InstallerHash & \text{update data}\\
+      \var{quan} & \Quantity & \text{positive quantity of a token}\\
+      \var{quan} & \QuantityPM & \text{quantity of a token}\\
       \var{exunits} & \ExUnits & \text{units of script execution} \\
       \var{f} & \ForFee & \text{inputs intended for script fees} \\
       \var{nf} & \NForFee & \text{inputs not for script fees} \\
@@ -149,6 +95,10 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       & \CurrencyId \mapsto (\Token \mapsto \Quantity)
       & \text{a collection of tokens}
       \\
+      \var{val} & \ValuePM
+      & \CurrencyId \mapsto (\Token \mapsto \QuantityPM)
+      & \text{a positive or negative value}
+      \\
       \var{isf} & \ForFee \uniondistinct \NForFee
       & \text {tag for inputs used to pay script fees}
       \\
@@ -157,9 +107,9 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       & \TxId \times \Ix
       & \text{UTxO entry reference}
       \\
-      \var{(\var{hashscr_v}, \var{script_r},\var{exunits})}
+      \var{(\var{hashscr_v}, \var{script_d},\var{script_r},\var{exunits})}
       & \Info
-      & \HashScr \times \ScriptR \times \ExUnits
+      & \HashScr \times \ScriptD \times \ScriptR \times \ExUnits
       & \text{validation data}
       \\
       (\var{txid}, \var{ix}, \var{inf})
@@ -174,17 +124,17 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \\
       \var{ptx}
       & \PendingTxInS
-      & \TxIn \times (\HashScr \times \HashScr) \times \Value
+      & \TxIn \times (\HashScr \times \HashDat) \times \Value
       & \text{pending Tx script input}
       \\
-      (\var{addr}, c)
+      (\var{addr}, v)
       & \type{TxOutVK}
       & \Addr \times \Value
       & \text{vk address output}
       \\
-      (\var{addr}, c)
+      (\var{addr}, v, \var{hashscr_d})
       & \type{TxOutScr}
-      & \type{TxOutVK} \times \ScriptD
+      & \type{TxOutVK} \times \HashDat
       & \text{script address output}
       \\
       \var{txout}
@@ -201,41 +151,45 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       & \Wdrl
       & \AddrRWD \mapsto \Coin
       & \text{reward withdrawal}
-      \\
-      \var{pup}
-      & \PPUpdate
-      & \KeyHashGen \mapsto \Ppm \mapsto \Seed
-      & \text{PP update}
-      \\
-      \var{av}
-      & \ApVer
-      & \N
-      & \text{application versions}
-      \\
-      \var{md}
-      & \Metadata
-      & \SystemTag\mapsto\InstallerHash
-      & \text{application metadata}
-      \\
-      \var{apps}
-      & \Applications
-      & \ApName \mapsto (\ApVer \times \Metadata)
-      & \text{application versions}
-      \\
-      \var{aup}
-      & \AVUpdate
-      & \KeyHashGen \mapsto \Applications
-      & \text{application update}
-      \\
-      \var{up}
-      & \Update
-      & \PPUpdate \times \AVUpdate
-      & \text{update proposal}
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system}
   \label{fig:defs:utxo-shelley-1}
 \end{figure*}
+
+The types for PendingTx are added in Figure \ref{fig:defs:utxo-pending}.
+These roughly match the types currently in the master plutus branch.
+
+In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
+
+\begin{itemize}
+  \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
+  time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
+  where the first slot is accessed by $\fun{txlst}$. The body now also includes
+  a finite map lookup $\HashScr \mapsto \Script$ to avoid having multiple
+  copies of the validator (one for each input spending from that script).
+  \item $\HashDat \mapsto \Data$ is a similar lookup for data scripts.
+  The full data script is now optional to include in a transaction when
+  paying to a script. It is never
+  stored on-chain and is only provided for the spender of the output
+  to be able to look it up when necessary (i.e. when spending the output),
+  provided the block that contained it is still available to the spender.
+  Supplying the full data script increases the size of the transaction and
+  thus the fees.
+  \item $\TxBody$ now includes $\ValuePM$, which represents
+  the tokens forged and taken out of circulation by the transaction
+  \item $\TxValTag$ is now part of the $\Tx$ type. This is a tag that is
+  set by the slot leader submitting the block containing this transaction.
+  It can later be used to re-apply blocks without performing script validation
+  again.
+  \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
+  are included.
+  \item $\fun{txinputs}$ type changed to map to $\TxInTx$
+  \item $~\fun{txlst},~\fun{val},~\fun{addr},~\fun{txlst},~\fun{txvals},~\fun{txdats},
+  ~\fun{forged}$
+  accessor functions added
+\end{itemize}
+
 
 \begin{figure*}[htb]
   \emph{PendingTx Types}
@@ -256,7 +210,7 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
       \\
       \var{ptx}
       & \PendingTx
-      & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Value \times
+      & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Coin \times
       \PendingTxInS \times (\Slot\times\Slot)
       \\
     \end{array}
@@ -272,8 +226,9 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Value \times (\Slot\times\Slot) \\
-    &~& \times (\HashScr \mapsto \Script) \times \Wdrl \times \Update
+      \times \Coin \times \ValuePM \times (\Slot\times\Slot) \\
+    &~& \times (\HashScr \mapsto \Script) \times (\HashDat \mapsto \Data)
+    \times \Wdrl \times \Update
   \end{align*}
   %
   \begin{equation*}
@@ -290,43 +245,59 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
       \fun{txinputs} & \Tx \to \powerset{\TxInTx} & \text{transaction inputs} \\
-      \fun{txouts} & \Tx \to (\Ix \mapsto \TxOut) & \text{transaction outputs} \\
-      \fun{txcerts} & \Tx \to \seqof{\DCert} & \text{delegation certificates} \\
-      \fun{txfee} & \Tx \to \Coin & \text{transaction fee} \\
-      \fun{txsize} & \Tx \to \N & \text{transaction size} \\
-      \fun{txttl} & \Tx \to \Slot & \text{time to live} \\
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
-      \fun{txwdrls} & \Tx \to \Wdrl & \text{withdrawals} \\
-      \fun{txbody} & \Tx \to \TxBody & \text{transaction body}\\
-      \fun{txwitsVKey} & \Tx \to (\VKey \mapsto \Sig) & \text{VKey witnesses} \\
-      \fun{txup} & \Tx \to \Update & \text{protocol parameter update} \\
-      \fun{scrsize} & \Script \uniondistinct \Data \to \N & \text{data size} \\
       \fun{val} & \TxOut \to \Value & \text{output value} \\
       \fun{addr} & \TxOut \to \Addr & \text{output address} \\
       \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
       \fun{txvals} & \Tx \to (\HashScr \mapsto \Script) & \text{validator scripts}\\
+      \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
+      \fun{forged} & \Tx \to \ValuePM & \text{value forged by tx}\\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
   \label{fig:defs:utxo-shelley-2}
 \end{figure*}
-%
+
+
+In Figure \ref{fig:defs:functions-helper} are the helper functions used for
+processing transaction data for validation.
+
+\begin{itemize}
+  \item $\fun{adaID},~\fun{adaToken},~\fun{cu},~\fun{coi},~\fun{adaVal}$ are used
+  for converting between Ada and other currencies
+  \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
+  abstract functions.
+  \item The other functions are needed for building $\PendingTx$
+\end{itemize}
+
 \begin{figure*}[htb]
-  \emph{Abstract Functions}
+  \emph{Abstract Functions and Values}
   %
   \begin{align*}
-    \fun{hashScript} \in & \Script\to \HashScr & \text{compute script hash} \\
-    \fun{hashData} \in & \Data \to \HashDat
+    \mathsf{adaID} \in& ~\CurrencyId
+    & \text{Ada currency ID} \\
+    \mathsf{adaToken} \in& ~\Token
+    & \text{Ada Token} \\
+    \fun{qu} \in& ~\Coin \to \Quantity
+    & \text{convert a coin amount into quantity} \\
+    \fun{coi} \in& ~\Quantity \to \Coin
+    & \text{convert a quantity into a coin value} \\
+    \fun{hashScript} \in & ~\Script\to \HashScr
+    & \text{compute script hash} \\
+    \fun{hashData} \in & ~\Data \to \HashDat
     & \text{compute hash of data} \\
-    \fun{toData} \in & \PendingTx\to \Data
+    \fun{toData} \in & ~\PendingTx\to \Data
     & \text{encode PendingTx as Data} \\
   \end{align*}
   \emph{Helper Functions}
   %
   \begin{align*}
-    & \fun{pendingTxIn} \in \TxInTx \to \Coin \to \PendingTxIn \\
+    &\fun{adaVal} ~\in~ \Coin \to \Value \\
+    &\fun{adaVal}~{c} ~=~ \mathsf{adaID} \mapsto (\mathsf{adaToken} \mapsto  \fun{qu}~c) \\
+    & \text{make an Ada value term from a Coin} \\~\\
+    & \fun{pendingTxIn} \in \TxInTx \to \Value \to \PendingTxIn \\
     & \fun{pendingTxIn}~\var{txin}~\var{c} = \\
-    & \begin{cases}
+    & ~~\begin{cases}
           (txin,~{hashscr_v},\fun{hashData}~{script_r},c)
            & \text{if}~\var{txin} = ((txid,ix),(\var{hashscr_v}, \var{script_r},\wcard)) \in \TxInScr \\
           ((txid,ix),c) & \text{if}~
@@ -335,19 +306,45 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     & \text{build pending Tx input} \\~\\
     & \fun{mkIns} \in \Tx \to \UTxO \to \powerset{\PendingTxIn} \\
     & \fun{mkIns}~\var{tx}~\var{utxo} = \\
-    & \{ \fun{pendingTxIn}~\var{txin}~\var{\fun{val}~\var{txout}} ~\vert~ \var{txin} \mapsto \var{txout}
+    & ~~\{ \fun{pendingTxIn}~\var{txin}~(\fun{val}~\var{txout}) ~\vert~ \var{txin} \mapsto \var{txout}
     \in \fun{txins}~\var{tx} \restrictdom \var{utxo}\} \\
     & \text{build pending Tx inputs} \\~\\
     & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInS \to \PendingTx \\
     & \fun{validationData}~\var{utxo}~\var{tx}~\var{ptxis} = \\ &
-    ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\},
+    ~~ ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\},
     \fun{txfee}~{tx},\var{ptxis},(\fun{txlst}~{tx},\fun{txttl}~{tx})) \\
     & \text{build PendingTx} \\
   \end{align*}
   \caption{Script Validation}
   \label{fig:defs:functions-helper}
 \end{figure*}
-%
+
+
+In Figure \ref{fig:defs:functions-valid}, functions for script validation
+are presented.
+
+\begin{itemize}
+  \item $\fun{valMSIG}$ performs validation for multi-sig scripts
+  (this does not require data or redeemer scripts). The abstract $\ExUnits$
+  type can be defined to have a MSIG constructor specifically to
+  measure msig-related resources.
+  \item $\fun{valPLC}$ performs validation for plutus scripts.
+  \begin{note}
+    these need to be defined still
+  \end{note}
+\item $\fun{valScriptUpTo}$ is a script validation function. It takes the
+validator, redeemer and data scripts, and PendingTx as parameters. It also
+takes a term of type $\ExUnits$ as a parameter and performs validation
+\textit{limited by resource use as indicated in} $exunits$.
+\item The other functions are used to build PendingTx
+\end{itemize}
+
+\begin{note}
+  $\fun{valScriptUpTo}$  is the name of the function that replaces
+  $\fun{evaluateScript}$ in the existing multi-sig script validation
+  scheme in the ledger spec.
+\end{note}
+
 \begin{figure*}[htb]
   \emph{Script Validation Functions}
   %
@@ -359,11 +356,11 @@ takes a term of type $\ExUnits$ as a parameter and performs validation
     & \text{resource-restricted validation of a Plutus script} \\~\\
     & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \ExUnits)
     \to\Bool \\
-    & \fun{valScriptUpTo}~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~\var{exunits} \\
+    & \fun{valScriptUpTo}~\var{script_v} ~ \var{script_r}~\var{script_d}~\var{ptx}~\var{exunits} \\
     &~~= \begin{cases}
               \fun{valMSIG} ~\var{script_v} ~\var{ptx}~\var{exunits}
                & \text{if}~\var{script_v} \in \ScriptMSig \\
-              \fun{valPLC} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~\var{exunits} & \text{if}~
+              \fun{valPLC} ~\var{script_v} ~ \var{script_r}~\var{script_d}~\var{ptx}~\var{exunits} & \text{if}~
                \var{script_v} \in \ScriptPlutus
           \end{cases}
     \\ & \text{restricted validate script} \\~\\
