@@ -108,8 +108,14 @@ The changes due to Plutus integration are as follows:
   %
   \emph{Helper Functions}
   \begin{align*}
+    & \fun{adaAll} \in \UTxO \to \Coin
+    & \text{sum total of the amount of Ada in all outputs} \\
+    & \fun{adaAll}~{\var{utxo}} = \fun{coi}~
+          (\sum  {\mathsf{adaToken}} \restrictdom {\mathsf{adaID}} \restrictdom
+          \fun{ubalance}~\var{utxo}) \\
+    \nextdef
     & \fun{adaOnly} \in \UTxO \to \Coin
-    & \text{get the amount of Ada } \\
+    & \text{sum total of the amount of Ada-only outputs} \\
     & \fun{adaOnly}~{\var{utxo}} = \\
     & ~~\begin{cases}
           \fun{coi}~{q} ~& \text{if}~\fun{ubalance}~\var{utxo} = \{\mathsf{adaID} \mapsto
@@ -180,24 +186,49 @@ related to script fees.
     & \fun{scriptFees} \in \PParams \to \Tx \to \Coin \\
     & \text{fees for all scripts in Tx} \\
     & \fun{scriptFees} ~\var{pp}~\var{tx}~=~\\
-    &  ~~\sum_{(\wcard,(\wcard,\wcard,\wcard,~\var{exunits})) \in(\fun{txinputs_s} ~tx)}
+    &  ~~\sum_{(\wcard,(\wcard,\wcard,\wcard,~\var{exunits})) \in(\fun{txinputs_s} ~tx)
+    \cup (\wcard \mapsto (\wcard,\var{exunits}) \in \fun{txvals}~{tx})}
       \fun{scriptFee} ~\var{pp}~ \var{exunits}
     \nextdef
     & \fun{allValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all scripts in a tx validate} \\
     & \fun{allValidate}~{utxo}~{tx}~=~ \\
+    %
+    \nextdef
+    & \fun{allPlutusValidateCert} \in \UTxO \to \Tx \to \Bool \\
+    & \text{check that all certificate witnessing Plutus scripts in a tx validate} \\
+    & \fun{allPlutusValidateCert}~{utxo}~{tx}~=~ \\
+    & ~~\forall~cert \in
+    (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
+    &~~\exists h\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\Nothing,\Nothing,
+    \fun{validationData}~\var{utxo}~\var{tx}~h) \\
+    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v} \\
+    %
+    \nextdef
+    & \fun{allPlutusValidateWDRLS} \in \UTxO \to \Tx \to \Bool \\
+    & \text{check that all reward withdrawal locking Plutus scripts in a tx validate} \\
+    & \fun{allPlutusValidateWDRLS}~{utxo}~{tx}~=~ \\
+    & ~~\forall~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
+    & ~~ \exists h\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\Nothing,\Nothing,
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      (h,~\fun{adaVal}~c))) \\
+    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v} \\
+    %
     \nextdef
     & \fun{allPlutusValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all UTxO entry locking Plutus scripts in a tx validate} \\
     & \fun{allPlutusValidate}~{utxo}~{tx}~=~ \\
-    & ~~\forall~(txid,ix,(\var{hashscr_v},\var{script_d},\var{script_r},\var{exunits})) \in
-    \fun{txinputs_s}~\var{tx}, h\mapsto \var{script_v}\in \var{hashscr_v}\restrictdom\fun{txvals}~{tx}, \\
-    & ~~ (txid,ix) \mapsto ((a,c),hashscr_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r}, \\
-    & ~~ \fun{validationData}~\var{utxo}~\var{tx}~
-      ((txid,ix),~{hashscr_v},\fun{hashData}~{script_r},c) \\
-    & ~~ \wedge ~ \var{hashscr_d} = \fun{dataHash}~\var{script_d} ~\wedge~
-      h\mapsto\var{script_v} = \fun{validatorHash}~\var{a} \mapsto \var{script_v} \\
+    & ~~\forall~(txid,ix,((a,v),\var{script_d},\var{script_r},\var{exunits})) \in
+    \fun{txinputs_s}~\var{tx}, \\
+    & ~~\exists h\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ (txid,ix) \mapsto ((a,v),hashscr_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r},
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      ((txid,ix),~h,\fun{hashData}~{script_r},v)) \\
+    & ~~ \wedge ~ \var{hashscr_d} = \fun{hashData}~\var{script_d} ~\wedge~
+      h = ~\fun{hashScript}~\var{script_v} \\
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script}

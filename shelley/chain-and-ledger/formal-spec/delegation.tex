@@ -156,7 +156,110 @@ validator (applied to a specific data script) as the staking credential.
       \end{array}
       \right)
     }
-  \end{equation}
+
+    \nextdef
+
+    \begin{equation}
+      \label{eq:delegs-induct-R}
+      \inference[Seq-delg-ind-R]
+      {
+        \var{c}\in\DCertDeleg \Rightarrow \fun{dpool}~{c} \in \dom \var{stpools} \\
+        ptr \leteq (\var{slot},~\var{txIx},~\mathsf{len}~\Gamma) \\~\\
+          {
+            \begin{array}{c}
+              \var{slot}\\
+              \var{txIx}\\
+              \var{pp}\\
+              \var{tx}\\
+              \var{reserves}
+            \end{array}
+          }
+        \vdash
+        \var{dpstate}
+        \trans{delegs}{\Gamma}
+        \var{dpstate'}
+      \\~\\~\\
+      {
+        \begin{array}{c}
+          \var{slot}\\
+          \var{ptr}\\
+          \var{pp}\\
+          \var{reserves}
+        \end{array}
+      }
+      \vdash
+        \var{dpstate'}
+        \trans{\hyperref[fig:rules:delpl]{delpl}}{c}
+        \var{dpstate''}
+      }
+      {
+      {
+        \begin{array}{c}
+          \var{slot}\\
+          \var{txIx}\\
+          \var{pp}\\
+          \var{tx}\\
+          \var{reserves}
+        \end{array}
+      }
+      \vdash
+        \var{dpstate}
+        \trans{delegs}{\Gamma; c}
+        \varUpdate{\var{dpstate''}}
+      }
+    \end{equation}
+
+    \nextdef
+
+    \begin{equation}
+      \label{eq:delegs-induct-NR}
+      \inference[Seq-delg-ind-NR]
+      {
+        \var{c}\in\DCertDeleg \Rightarrow \fun{dpool}~{c} \in \dom \var{stpools} \\
+        ptr \leteq (\var{slot},~\var{txIx},~\mathsf{len}~\Gamma) \\~\\
+          {
+            \begin{array}{c}
+              \var{slot}\\
+              \var{txIx}\\
+              \var{pp}\\
+              \var{tx}\\
+              \var{reserves}
+            \end{array}
+          }
+        \vdash
+        \var{dpstate}
+        \trans{delegs}{\Gamma}
+        \var{dpstate'}
+      \\~\\~\\
+      {
+        \begin{array}{c}
+          \var{slot}\\
+          \var{ptr}\\
+          \var{pp}\\
+          \var{reserves}
+        \end{array}
+      }
+      \vdash
+        \var{dpstate'}
+        \trans{\hyperref[fig:rules:delpl]{delpl}}{c}
+        \var{dpstate''}
+      }
+      {
+      {
+        \begin{array}{c}
+          \var{slot}\\
+          \var{txIx}\\
+          \var{pp}\\
+          \var{tx}\\
+          \var{reserves}
+        \end{array}
+      }
+      \vdash
+        \var{dpstate}
+        \trans{delegs}{\Gamma; c}
+        \varUpdate{\var{dpstate''}}
+      }
+    \end{equation}
   \caption{Delegation sequence rules}
   \label{fig:rules:delegation-sequence}
 \end{figure}

@@ -52,7 +52,12 @@ goes to fees
   fee-marked inputs)
 
 12. The empty sequence LEDGERS rule is ok, right? Even in the case of
-script validation failure?
+script validation failure? There are no other rules firing with this
+specific transaction in the environment or signal?
+
+14. Is there a better way to express `adaAll`
+
+15. Note the type change of `PendingTxInS`
 
 13. Do Plutus scripts need access to other things like delegation state, etc.?
 

@@ -80,7 +80,7 @@ We also added the following protocol parameters:
 \end{figure*}
 
 In Figure \ref{fig:defs:protocol-parameters-helpers}, we have updated the
-transaction minimum fee to include all the script validation fees it must pay. 
+transaction minimum fee to include all the script validation fees it must pay.
 
 \begin{figure*}[htb]
   \emph{Helper Functions}
@@ -89,7 +89,7 @@ transaction minimum fee to include all the script validation fees it must pay.
     \fun{minfee} & \in \PParams \to \Tx \to \Coin & \text{minimum fee}\\
     \fun{minfee} & ~\var{pp}~\var{tx} =
     (\fun{a}~\var{pp}) \cdot \fun{txSize}~\var{tx} + (\fun{b}~\var{pp})
-    + (\fun{scriptFees}~{pp}~\var{tx})
+    + \fun{scriptFees}~{pp}~\var{tx}  + \fun{noDataScriptFees}~{pp}~\var{tx}
   \end{align*}
   %
   \caption{Helper functions for the Protocol Parameters}

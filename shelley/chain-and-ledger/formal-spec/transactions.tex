@@ -43,6 +43,11 @@ except for the following changes:
   \item $\TxOut,~\TxOutVK,~\TxOutScr$: An arbitrary output type (script or PK),
   as well as special output types for PK and script outputs. The script output
   includes a data script hash.
+
+  \item $\ValSR,~\ValOut,~\Vals$ are types which are finite maps for looking up
+  validator scripts by hashes. The scripts locking withdrawals and rewards
+  do not have an input containing the execution cost, so the execution cost
+  is paired with the hash in the $\ValSR$ type for such scripts.
 \end{itemize}
 
 
@@ -122,11 +127,6 @@ except for the following changes:
       & (\TxIn \times \IsFee) \uniondistinct \TxInScr
       & \text{transaction input}
       \\
-      \var{ptx}
-      & \PendingTxInS
-      & \TxIn \times (\HashScr \times \HashDat) \times \Value
-      & \text{pending Tx script input}
-      \\
       (\var{addr}, v)
       & \type{TxOutVK}
       & \Addr \times \Value
@@ -151,6 +151,21 @@ except for the following changes:
       & \Wdrl
       & \AddrRWD \mapsto \Coin
       & \text{reward withdrawal}
+      \\
+      \var{h \mapsto (hashscr_v,exunits)}
+      & \ValSR
+      & \HashScr \mapsto (\Script \times \ExUnits)
+      & \text{hash and validator with no data or redeemer}
+      \\
+      \var{h \mapsto hashscr_v}
+      & \ValOut
+      & \HashScr \mapsto \Script
+      & \text{hash and validator for output}
+      \\
+      \var{val}
+      & \Vals
+      & \ValOut \uniondistinct \ValSR
+      & \text{hash and validator}
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system}
@@ -166,7 +181,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
   where the first slot is accessed by $\fun{txlst}$. The body now also includes
-  a finite map lookup $\HashScr \mapsto \Script$ to avoid having multiple
+  a finite map lookup $\Vals$ to avoid having multiple
   copies of the validator (one for each input spending from that script).
   \item $\HashDat \mapsto \Data$ is a similar lookup for data scripts.
   The full data script is now optional to include in a transaction when
@@ -204,6 +219,10 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       & \PendingTxInS
       & \TxIn \times (\HashScr \times \HashDat) \times \Value
       \\
+      \var{ptxrs}
+      & \PendingTxInSRC
+      & \PendingTxInS \uniondistinct (\HashScr \times \Value) \uniondistinct \HashScr
+      \\
       \var{ptxi}
       & \PendingTxIn
       & \PendingTxInV \uniondistinct \PendingTxInS
@@ -211,7 +230,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \var{ptx}
       & \PendingTx
       & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Coin \times
-      \PendingTxInS \times (\Slot\times\Slot)
+      \PendingTxInSRC \times (\Slot\times\Slot)
       \\
     \end{array}
   \end{equation*}
@@ -227,7 +246,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
       \times \Coin \times \ValuePM \times (\Slot\times\Slot) \\
-    &~& \times (\HashScr \mapsto \Script) \times (\HashDat \mapsto \Data)
+    &~& \times \Vals \times (\HashDat \mapsto \Data)
     \times \Wdrl \times \Update
   \end{align*}
   %
@@ -249,7 +268,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{val} & \TxOut \to \Value & \text{output value} \\
       \fun{addr} & \TxOut \to \Addr & \text{output address} \\
       \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
-      \fun{txvals} & \Tx \to (\HashScr \mapsto \Script) & \text{validator scripts}\\
+      \fun{txvals} & \Tx \to \Vals & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
       \fun{forged} & \Tx \to \ValuePM & \text{value forged by tx}\\
     \end{array}
@@ -309,10 +328,10 @@ processing transaction data for validation.
     & ~~\{ \fun{pendingTxIn}~\var{txin}~(\fun{val}~\var{txout}) ~\vert~ \var{txin} \mapsto \var{txout}
     \in \fun{txins}~\var{tx} \restrictdom \var{utxo}\} \\
     & \text{build pending Tx inputs} \\~\\
-    & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInS \to \PendingTx \\
-    & \fun{validationData}~\var{utxo}~\var{tx}~\var{ptxis} = \\ &
+    & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInSRC \to \PendingTx \\
+    & \fun{validationData}~\var{utxo}~\var{tx}~\var{ptxrs} = \\ &
     ~~ ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\},
-    \fun{txfee}~{tx},\var{ptxis},(\fun{txlst}~{tx},\fun{txttl}~{tx})) \\
+    \fun{txfee}~{tx},\var{ptxrs},(\fun{txlst}~{tx},\fun{txttl}~{tx})) \\
     & \text{build PendingTx} \\
   \end{align*}
   \caption{Script Validation}
