@@ -59,6 +59,10 @@ specific transaction in the environment or signal?
 
 15. Note the type change of `PendingTxInS`
 
+16. Any problem with possibly having extra validators in the Vals map?
+
+17. Is it useful to expose transaction metadata to scripts?
+
 13. Do Plutus scripts need access to other things like delegation state, etc.?
 
 5. Data scripts not stored in the UTxO at all, but supplied by both the

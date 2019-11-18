@@ -10,46 +10,16 @@ outputs, which are used in defining the UTxO transition system. These are
 given in Figure \ref{fig:functions:insouts}. These include
 
 \begin{itemize}
-  \item Functions to
-sort inputs, outputs and UTxO entries into script and non-script.
-
   \item The function $\fun{txinputs_{vf}}$ returns only the inputs selected to be used
 for paying script execution fees
+  \item The function $\fun{txinputs_s}$ returns only script transaction inputs
   \item The function $\fun{txins}$ that returns $\TxIn$ part of both script
   and non-script transaction inputs.
   \item The function $\fun{outs}$ is unchanged
 \end{itemize}
 
-Figure~\ref{fig:functions:utxo} defines functions needed for the UTxO transition system.
-The changes due to Plutus integration are as follows:
-
-\begin{itemize}
-
-  \item
-    The $\fun{ubalance}$ function calculates the (aggregated by currency ID and
-    Token) sum total of all the value in a given UTxO.
-
-  \item The $\fun{consumed}$ calculation for the preservation of value remains the
-  same. It is still the sum of the reward address coin consumed, the coin value
-   UTxO entries consumed, and the value consumed from the deposit pot due
-   to the transaction collecting deposit refunds.
-
-  \item The $\fun{produced}$ calculation contains the fee a transaction pays
-  to the fee pot, the outputs it adds to the UTxO, and the deposits it makes
-  to the deposit pot (these are the same values as the ledger spec). We also
-  now add the script execution fees the transaction is paying, and the deposits
-  for putting a data script on-chain (this functionality is not yet fully
-  implemented, decision on whether it is useful is pending).
-\end{itemize}
-
-
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{txinputs_v} \in \Tx \to \powerset{\TxIn}
-    & \text{tx VK inputs} \\
-    & \fun{txinputs_v} ~tx ~=~
-    \fun{txinputs} ~tx\cap (\TxIn\times\IsFee)
-    \nextdef
     & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn}
     & \text{tx VK inputs used for fees} \\
     & \fun{txinputs_{vf}} ~tx~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
@@ -59,33 +29,6 @@ The changes due to Plutus integration are as follows:
     & \fun{txinputs_s} \in \Tx \to \powerset{\TxOutScr}
     & \text{tx script inputs} \\
     & \fun{txinputs_s} ~tx ~=~ \fun{txinputs} ~tx\cap \TxInScr
-    \nextdef
-    & \fun{txouts_s} \in \Tx \to \powerset{\TxOutScr}
-    & \text{tx script outputs} \\
-    & \fun{txouts_s} ~ \var{tx} =
-        \left\{
-          \var{ix} \mapsto \var{txout}~\in ~\txouts{tx} ~
-          \middle|
-          \var{txout} \in \TxOutScr
-        \right\}
-    \nextdef
-    & \fun{txouts_v} \in \Tx \to \powerset{\TxOutVK}
-    & \text{tx vk outputs} \\
-    & \fun{txouts_v} ~ \var{tx} =
-      \left\{
-        \var{ix} \mapsto \var{txout} ~\in ~\txouts{tx}~
-        \middle|
-        \var{txout} \in \TxOutVK
-      \right\}
-    \nextdef
-    & \fun{utxo_s} \in \UTxO \to \TxIn \mapsto \powerset{\TxOutScr}
-    & \text{script utxo entries} \\
-    & \fun{utxo_s} ~ \var{utxo} =
-        \left\{
-          \var{txin} \mapsto \var{txout} ~\in~ \var{utxo}~
-          \middle|
-          \var{txout} \in \TxOutScr
-        \right\}
     \nextdef
     & \fun{outs} \in \Tx \to \UTxO
     & \text{tx outputs as UTxO} \\
@@ -102,6 +45,32 @@ The changes due to Plutus integration are as follows:
   \caption{Functions on Tx Inputs and Outputs}
   \label{fig:functions:insouts}
 \end{figure}
+
+
+Figure~\ref{fig:functions:utxo} defines functions needed for the UTxO transition system.
+The changes due to Plutus integration are as follows:
+
+\begin{itemize}
+  \item $\fun{adaAll}$ adds up all the Ada in a UTxO
+
+  \item $\fun{adaOnly}$ adds up all Ada in a UTxO and returns 0 if there were
+  non-Ada tokens in it.
+
+  \item
+    The $\fun{ubalance}$ function calculates the (aggregated by currency ID and
+    Token) sum total of all the value in a given UTxO.
+
+  \item The $\fun{consumed}$ calculation for the preservation of value remains the
+  same. It is still the sum of the reward address coin consumed, the coin value
+   UTxO entries consumed, the value forged by a transaction,
+   and the value consumed from the deposit pot due
+   to the transaction collecting deposit refunds.
+
+  \item The $\fun{produced}$ calculation contains the fee a transaction pays
+  to the fee pot, the outputs it adds to the UTxO, and the deposits it makes
+  to the deposit pot (these are the same values as the ledger spec).
+  The script execution costs are included in the transaction fee.
+\end{itemize}
 
 
 \begin{figure}[htb]
@@ -147,7 +116,6 @@ The changes due to Plutus integration are as follows:
     & \fun{produced}~\var{pp}~\var{stpools}~\var{tx} = \\
     &~~\ubalance{(\outs{tx})}
     + \fun{adaVal}~(\txfee{tx}) + \fun{adaVal}~(\deposits{pp}{stpools}~{(\txcerts{tx})})\\
-    &~~+ \fun{adaVal}~(\fun{scriptFees}~{pp}~\var{tx})
   \end{align*}
   \caption{Functions used in UTxO rules}
   \label{fig:functions:utxo}
@@ -155,7 +123,7 @@ The changes due to Plutus integration are as follows:
 
 \clearpage
 
-In the following Figure \ref{fig:functions:script} we give the functions
+In the following Figure \ref{fig:functions:script1} we give the functions
 related to script fees.
 
 \begin{itemize}
@@ -173,8 +141,14 @@ related to script fees.
   of using a unit of each of the types of resources which execution units is
   made up of.
 
-  \item $\fun{scriptFees}$ adds up all the fees for all script spending
-  done by a transaction
+  \item $\fun{scriptFees}$ adds up all the fees for all script validation
+  done by a transaction, including
+
+  * stake key deregistration certificates
+
+  * reward withdrawals
+
+  * script-locked output spending
 \end{itemize}
 
 \begin{figure}[htb]
@@ -186,103 +160,134 @@ related to script fees.
     & \fun{scriptFees} \in \PParams \to \Tx \to \Coin \\
     & \text{fees for all scripts in Tx} \\
     & \fun{scriptFees} ~\var{pp}~\var{tx}~=~\\
-    &  ~~\sum_{(\wcard,(\wcard,\wcard,\wcard,~\var{exunits})) \in(\fun{txinputs_s} ~tx)
-    \cup (\wcard \mapsto (\wcard,\var{exunits}) \in \fun{txvals}~{tx})}
+    &  ~~\sum_{\substack{(\wcard,(\wcard,\wcard,\wcard,~\var{exunits}))
+      \in(\fun{txinputs_s} ~tx) \\
+      \cup (\wcard \mapsto (\wcard,\var{exunits}) \in \fun{txvals}~{tx})}}
       \fun{scriptFee} ~\var{pp}~ \var{exunits}
     \nextdef
     & \fun{allValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all scripts in a tx validate} \\
-    & \fun{allValidate}~{utxo}~{tx}~=~ \\
-    %
-    \nextdef
-    & \fun{allPlutusValidateCert} \in \UTxO \to \Tx \to \Bool \\
-    & \text{check that all certificate witnessing Plutus scripts in a tx validate} \\
-    & \fun{allPlutusValidateCert}~{utxo}~{tx}~=~ \\
-    & ~~\forall~cert \in
-    (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
-    &~~\exists h\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvals}~{tx}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\Nothing,\Nothing,
-    \fun{validationData}~\var{utxo}~\var{tx}~h) \\
-    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v} \\
-    %
-    \nextdef
-    & \fun{allPlutusValidateWDRLS} \in \UTxO \to \Tx \to \Bool \\
-    & \text{check that all reward withdrawal locking Plutus scripts in a tx validate} \\
-    & \fun{allPlutusValidateWDRLS}~{utxo}~{tx}~=~ \\
-    & ~~\forall~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
-    & ~~ \exists h\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\Nothing,\Nothing,
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      (h,~\fun{adaVal}~c))) \\
-    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v} \\
-    %
-    \nextdef
-    & \fun{allPlutusValidate} \in \UTxO \to \Tx \to \Bool \\
-    & \text{check that all UTxO entry locking Plutus scripts in a tx validate} \\
-    & \fun{allPlutusValidate}~{utxo}~{tx}~=~ \\
-    & ~~\forall~(txid,ix,((a,v),\var{script_d},\var{script_r},\var{exunits})) \in
-    \fun{txinputs_s}~\var{tx}, \\
-    & ~~\exists h\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
-    & ~~ (txid,ix) \mapsto ((a,v),hashscr_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r},
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      ((txid,ix),~h,\fun{hashData}~{script_r},v)) \\
-    & ~~ \wedge ~ \var{hashscr_d} = \fun{hashData}~\var{script_d} ~\wedge~
-      h = ~\fun{hashScript}~\var{script_v} \\
+    & \fun{allValidate}~{utxo}~{tx}~=~
+    \fun{allCertValidate}~{utxo}~{tx} + \fun{allWDRLSValidate}~{utxo}~{tx} \\
+    & ~~ + \fun{allInsValidate}~{utxo}~{tx} \\
   \end{align*}
   \caption{Script Cost Calculations}
-  \label{fig:functions:script}
+  \label{fig:functions:script1}
 \end{figure}
 
-The types for the UTxO transition are given in Figure~\ref{fig:ts-types:utxo-shelley}.
-These remain unchanged.
+In Figure \ref{fig:functions:script2}, we give the three functions
+used for script validation for a given transaction,
+
+\begin{itemize}
+\item $\fun{allCertValidate}$ verifies that all script witnesses of certificates
+validate (this refers only to stake deregistration certificates, as these are the
+only kind that could have script witnesses)
+\item $\fun{allWDRLSValidate}$ verifies that all withdrawals from script reward
+addresses are validated
+\item $\fun{allInsValidate}$ verifies that all UTxO entry spending from scripts
+is validated
+\end{itemize}
+
+Each validation computation returns $\mathsf{True}$ upon completing
+the validation constrained by the resource limitations listed in $\var{exunits}$.
+There are several pieces of data from different sources involved in these
+verifications:
+
+\begin{itemize}
+\item the hash of the validator script, which is either the reward address,
+the certificate witness, or the payment credential part of a UTxO address
+
+* the corresponding
+full validator is looked up (by hash value) in the finite map $\fun{txvals}$ in the
+body of the transaction, and must hash to the value by which it is indexed
+
+\item the data script, which is included in the script input
+
+* this data script must hash to the value stored in the UTxO entry correposing to
+this transaction input
+
+\item the redeemer script, provided in full as part of a script-spending
+transaction input
+
+\item the execution units, also provided in the input
+
+\item the $\Value$ of the UTxO entry being spent, or the coin value associated
+with reward address
+\end{itemize}
+
+Recall that $\fun{validationData}$ constructs the $\PendingTx$.
+Note here that in all three cases, we may have a Plutus or a multisig script.
+We use the same notation for both. Note also that in the case of UTxO
+spending, we must distinguish the two cases: multisig (which cannot
+have a data or redeemer arguments), and Plutus (which must explicitly be
+applied to the provided data and redeemer scripts in this case).
+This notational distinction is not necessary for certificates or reward withdrawals
+because neither allow for non-empty data and redeemer scripts.
+
+Note here that the wallet is responsible to determining the $\var{exunits}$ value
+by running the script itself to see how much resources it takes. It is then
+also responsible for adding enough inputs to the transaction to cover the
+fees required for using the resources indicated in $\var{exunits}$ (as
+calculated by the $\fun{scriptFees}$ function).
 
 \begin{figure}[htb]
-  \emph{UTxO environment}
-  \begin{equation*}
-    \UTxOEnv =
-    \left(
-      \begin{array}{r@{~\in~}lr}
-        \var{slot} & \Slot & \text{current slot}\\
-        \var{pp} & \PParams & \text{protocol parameters}\\
-        \var{stdelegs} & \StakeDeleg & \text{stake credential}\\
-        \var{stpools} & \StakePools & \text{stake pool}\\
-        \var{dms} & \KeyHashGen\mapsto\KeyHash & \text{genesis key delegations} \\
-      \end{array}
-    \right)
-  \end{equation*}
-  %
-  \emph{UTxO States}
-  \begin{equation*}
-    \UTxOState =
-    \left(
-      \begin{array}{r@{~\in~}lr}
-        \var{utxo} & \UTxO & \text{UTxO}\\
-        \var{deposits} & \Coin & \text{deposits pot}\\
-        \var{fees} & \Coin & \text{fee pot}\\
-        \var{ups} & \UpdateState & \text{update state}\\
-      \end{array}
-    \right)
-  \end{equation*}
-  %
-  \emph{UTxO transitions}
-  \begin{equation*}
-    \_ \vdash
-    \var{\_} \trans{utxo}{\_} \var{\_}
-    \subseteq \powerset (\UTxOEnv \times \UTxOState \times \Tx \times \UTxOState)
-  \end{equation*}
-  %
-  \caption{UTxO transition-system types}
-  \label{fig:ts-types:utxo-shelley}
+  \begin{align*}
+    & \fun{allCertValidate} \in \UTxO \to \Tx \to \Bool \\
+    & \text{check that all certificate witnessing scripts in a tx validate} \\
+    & \fun{allCertValidate}~{utxo}~{tx}~=~ \\
+    & ~~\forall~cert \in
+    (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
+    &~~\forall~h\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~h) \\
+    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
+    & ~~  \vert \fun{regCred}~\var{cert}\restrictdom\fun{txvals}~{tx} \vert = 1 \\
+    %
+    \nextdef
+    & \fun{allWDRLSValidate} \in \UTxO \to \Tx \to \Bool \\
+    & \text{check that all reward withdrawal locking scripts in a tx validate} \\
+    & \fun{allWDRLSValidate}~{utxo}~{tx}~=~ \\
+    & ~~\forall~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
+    & ~~ \forall~ h\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      (h,\fun{adaVal}~c))) \\
+    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
+    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx} \vert = 1 \\
+    %
+    \nextdef
+    & \fun{allInsValidate} \in \UTxO \to \Tx \to \Bool \\
+    & \text{check that all UTxO entry locking scripts in a tx validate} \\
+    & \fun{allInsValidate}~{utxo}~{tx}~=~ \\
+    & ~~(\forall~(txid,ix,((a,v),\var{script_d},\var{script_r},\var{exunits})) \in
+    \fun{txinputs_s}~\var{tx}, \\
+    & ~~\forall ~h\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ \forall~(txid,ix) \mapsto ((a,v),hashscr_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~ \var{hashscr_d} = \fun{hashData}~\var{script_d} ~\wedge~ \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r},
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      ((txid,ix),h,\fun{hashData}~{script_r},v))) \\
+    &~~ \wedge~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
+    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx} \vert = 1) ~\wedge~ \\~\\
+      %
+    & ~~(\forall~(txid,ix,(a,v)) \in \fun{txinputs_s}~\var{tx}, \\
+    & ~~\forall ~h\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~\forall ~(txid,ix) \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      ((txid,ix),h,v) \\
+    & ~~ \wedge~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
+    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx} \vert = 1) \\
+  \end{align*}
+  \caption{Script Cost Calculations}
+  \label{fig:functions:script2}
 \end{figure}
 
 Figure \ref{fig:ts-types:utxo-scripts} gives the transition system for the second phase of
-the two-phase script validation. The second phase means actually running
-the scripts to see if they validate. Recall that scripts are only run to use a quantity of
-resources limited by the values in the $\var{exunits}$. Only the fee pot and the
-UTxO are affected by this validation step. The protocol parameters in the
-environment are needed to calculate the total script fees in the associated
-transition rules.
+the two-phase script validation. The second phase requires actually running
+the scripts to see if they validate. This system has exactly the same
+signal, environment and state as the UTXO transition system. It is saparate
+from the UTXO system to isolate the second phase of script validation
 
 \begin{figure}[htb]
   %
@@ -299,53 +304,40 @@ transition rules.
 
 The rules for the second-phase script validation are given in
 Figure~\ref{fig:rules:utxo-scrval}. There are two transition rules.
-The first predicate in each checks the value of the validity tag.
-The first rule applies when all scripts validate in the transaction,
-and the value of the tag must indicate this (it must be $\ValTag$).
-The second rule applies when some script does not validate, so the
-tag for these types of transactions has to be $\InValTag$. We want to
-throw away all the blocks which have transactions with these tags
-applied incorrectly.
-
-The second predicate in each rule is the script validation.
-The first rule applies when all scripts validate, and the second rule applies when
-some script does not.
-More precisely, the predicate states that, for every script-spending
-transaction input $txin \in \TxInTx$,
+The first rule, $\mathsf{Scripts\mbox{-}Val}$,
+is for the application of a transaction containing only
+validating scripts. It applies when:
 
 \begin{itemize}
-\item Applying the validator associated with this transaction input
-to the data script stored in the corresponding UTxO entry and the redeemer
-script (again, provided in the transaction input), as well as the PendingTx
-constructed by the $\fun{validationData}$ function, returns $\mathsf{True}$.
-\item This validation computation returns $\mathsf{True}$ upon completing
-the validation constrained by the resource limitations listed in $\var{exunits}$.
-\item The hash of the validator provided in the transaction input is
-the same as the address of the UTxO entry being spent.
+  \item The validity tag of the transaction is $\ValTag$
+  (correponding predicate failure is \emph{BagValidationTag})
+  \item All scripts (Plutus and multisig) in that transaction validate
+  (correponding predicate failure is \emph{ScriptsDontValidate})
+  \item The update proposals in this transaction result in a valid state change
 \end{itemize}
 
-Note here that the wallet is responsible to determining the $\var{exunits}$ value
-by running the script itself to see how much resources it takes. It is then
-also responsible for adding enough inputs to the transaction to cover the
-fees required for using the resources indicated in $\var{exunits}$ (as
-calculated by the $\fun{scriptFees}$ function).
+When this rule applies, the states of the UTxO, fee
+  and deposit pots, and updates are updated exactly as in the current
+  ledger spec.
 
-For each of the two rules, the following state changes occur:
+The $\mathsf{Scripts\mbox{-}NotVal}$ rule applies when
 
 \begin{itemize}
-  \item $\mathsf{Scripts-Val}$: This is the rule that applies when validation
-  of all scripts in a transaction is successful. The UTxO is updated in the usual way, all
-  the outputs referenced by the transaction inputs are removed, and all the
-  transaction outputs are added to the UTxO, identified by the hash of
-  the transaction and the index associated with the output in the transaction.
-  The exact fees for script execution are added to the fee pot.
-
-  \item $\mathsf{Scripts-NotVal}$: This rule applies when validation fails
+  \item validation fails
   for one of the scripts in the transaction (only one script validation may fail,
-  since validation does not proceed after this). In this case, all the
+  since validation does not proceed after this). In this case,
+  \item The validation tag is $\InValTag$
+\end{itemize}
+
+Its application results in the following state changes:
+
+\begin{itemize}
+  \item All the
   UTxO entries corresponding to the transaction inputs selected for covering
-  script fees are removed. The sum total of the value of these UTxO entries
-  is added to the fee pot.
+  script fees are removed
+
+  \item The sum total of the value of the marked UTxO entries
+  is added to the fee pot
 \end{itemize}
 
 It is always in the interest of the slot leader to have the new block validate,
@@ -356,18 +348,14 @@ slot leader to:
 \begin{itemize}
   \item correctly apply of the $\TxValTag$ tag,
   \item include transactions that validate in every way
-  \textit{except possibly script validation failure}
+  \textit{except possibly 2nd step script validation failure}
   \item exclude any transactions that are invalid
-in some way \textit{other than script validation failure}
+in some way \textit{other than 2nd step script validation failure}
 \end{itemize}
 
-The only situation in which nodes may end up using resources to run
-script validation without collecting fees for it is: if a block contains
-a transaction that does not validate in a way other than script validation
-failure. An example of this would be incorrect witnessing of spending
-of PK UTxO entries. As mentioned above, including such a transaction would not be
-in the slot leader's interest and should happen rarely.
-
+We want to
+throw away all the blocks which have transactions with these tags
+applied incorrectly.
 Note that the reason for having the correct validation tag added by the slot leader
 to a transaction is that re-applying blocks would not require repeat
 execution of scripts in the transactions inside a block.
@@ -475,50 +463,30 @@ will result in the funds being locked forever in the associated rewards account.
   \label{fig:rules:utxo-scrval}
 \end{figure}
 
-In Figure \ref{fig:rules:utxo-shelley}, we present the ${UTxO-inductive}$
+In Figure \ref{fig:rules:utxo-shelley}, we present the $\type{UTxO-inductive}$
 transition rule. It compares to the original rule in the Shelley ledger spec
-as follows. The preconditions remain the same, with two additions:
+as follows. The preconditions remain the same, with the following additions:
 
 \begin{itemize}
-  \item The $\fun{scriptFees}~{pp}~\var{tx} \leq ...$ equation is added to check
+  \item the $\fun{txfee}~\var{tx} \leq ...$ check
   that the value of the outputs corresponding to the inputs selected
   for paying script fees indeed covers the total fee amount (and does not
-  include non-Ada tokens)
+  include non-Ada tokens),
 
-  \item The check that the execution units for a given script are less than
-  the allowed maximum
+  \item the check that the execution units for a given script are less than
+  the allowed maximum,
 
-  \item The check that the hash-indexed data scripts in the
-  transaction indeed correspond to their hash indexes
+  \item the check that the hash-indexed data scripts in the
+  transaction indeed correspond to their hash indexes,
 
-  \item the UTXOS transition is added to handle UTxO updates in the presense
-  of script validation constraints
+  \item the UTXOS state transition.
 \end{itemize}
 
 Note that the types and rules for the UP transition (which is one of the
-pre-conditions in the are $UTxO-inductive$ rule) are not included
+pre-conditions in the are $\type{UTxO-inductive}$ rule) are not included
 in this document as there is no change there due to Plutus integration.
-The state change in the consequent this rule compares to the Shelley spec
-as follows:
-
-\begin{itemize}
-  \item The state changes for $\var{deposits}$ and $\var{ups}$ remain
-  the same as in the Shelley ledger rules.
-
-  \item The $\var{utxo}$ state chage is now computed by the UTXOS transition
-  (which is now part of the pre-conditions for this rule)
-
-  \item The change in the $\var{fees}$ pot due to script validation is
-  also computed in the UTXOS transition. However, the transaction fee, as well
-  as the decayed deposit amount is added to the fee pot via this rule.
-
-\end{itemize}
-
-  Note that the preservation of value equation does not change depending on
-  whether script validation succeeds or
-  fails for some script. The accounting for the two-phase validation
-  is handled in the UTXOS rule. Recall here that the preservation of value
-  calculation now includes script fees.
+All of the state changes of the UTXO transition rules are prescribed by
+the UTXOS transition in the precondition.
 
 
 \begin{figure}[htb]
@@ -635,7 +603,10 @@ functions, predicates, and let-bindings having to do with scripts.
 Note here that witnessing (at least for spending PK outputs) must necessarily
 be done before the second phase of script validation (i.e. scipt execution).
 This is because script validation takes resources, the use of which must
-be covered by fees regardless of whether the validation succeeds. Witnessing
+be covered by fees regardless of whether the validation succeeds.
+Note that if a block is deemed invalid for a reason other than
+script validation failure, as usual the block will be discarded and
+these fees will not be paid. Witnessing
 guarantees that all PK outputs spending is authorized, and it is fine to
 consume the PK outputs as fee payment. In the UTXOW transition rule,
 this is the case. Witnessing predicates are first, followed by the UTXO transition
