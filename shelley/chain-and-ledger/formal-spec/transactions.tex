@@ -7,7 +7,7 @@ as much as possible,
 except for the following changes:
 
 \begin{itemize}
-  \item $\Coin,~\CurrencyId,~\Token,~\Quantity,~\QuantityPM$ are all types
+  \item $\Coin,~\CurrencyId,~\Token,~\Quantity$ are all types
   related to native multicurrency on the ledger.
 
   \item $\ForFee$ and $\NForFee$: These are tags used to sort public key
@@ -18,8 +18,8 @@ except for the following changes:
   \item $\ScriptPlutus$ and $\ScriptMSig$ are two types of scripts this spec
   covers validation of
 
-  \item $\ValTag$ and $\InValTag$: These are tags used to indicate if a
-  transaction is expected to validate.
+  \item $\ValTag$ and $\InValTag$: These are tags used to indicate if all scripts
+  in a transaction are expected to validate.
   $\TxValTag$ represents either.
 
   \item $\Data$: is the type of all arguments passed to the validator script.
@@ -27,13 +27,13 @@ except for the following changes:
   \item $\ScriptV,~ \ScriptR,~ \ScriptD$: are the types of the validator,
   redeemer and data scripts.
 
-  \item $\Value$ and $\ValuePM$ are multicurrency types used to represent
+  \item $\Value$ is the multicurrency type used to represent
   both fungible and non fungible tokens
 
   \item $\Info$: is the additional information an input in a transaction must
-  have when spending a script output. This includes the validator, redeemer,
-  data script,
-  as well as the resource consumption for validating spending the script output
+  have when spending a script output. This includes the redeemer,
+  data, and
+  the resource consumption for validating spending the script output
   , expressed as $\var{exunits}$.
 
   \item $\TxInScr$: A transaction input spending a script output.
@@ -47,10 +47,11 @@ except for the following changes:
   as well as special output types for PK and script outputs. The script output
   includes a data script hash.
 
-  \item $\ValSR,~\ValOut,~\Vals$ are types which are finite maps for looking up
-  validator scripts by hashes. The scripts locking withdrawals and rewards
+  \item $\VldSR,~\VldOut,~\Vlds$ are types which are finite maps for looking up
+  validator scripts by hashes. The scripts witnessing reward withdrawals and
+  scripts
   do not have an input containing the execution cost, so the execution cost
-  is paired with the hash in the $\ValSR$ type for such scripts.
+  is paired with the hash in the $\VldSR$ type for such scripts.
 \end{itemize}
 
 
@@ -62,8 +63,7 @@ except for the following changes:
       \var{c} & \Coin & \text{Ada value}\\
       \var{curid} & \CurrencyId & \text{currency id}\\
       \var{tok} & \Token & \text{token identifier}\\
-      \var{quan} & \Quantity & \text{positive quantity of a token}\\
-      \var{quan} & \QuantityPM & \text{quantity of a token}\\
+      \var{quan} & \Quantity & \text{quantity of a token}\\
       \var{f} & \ForFee & \text{inputs intended for script fees} \\
       \var{nf} & \NForFee & \text{inputs not for script fees} \\
       \var{plc} & \ScriptPlutus & \text{Plutus scripts} \\
@@ -102,10 +102,6 @@ except for the following changes:
       & \CurrencyId \mapsto (\Token \mapsto \Quantity)
       & \text{a collection of tokens}
       \\
-      \var{val} & \ValuePM
-      & \CurrencyId \mapsto (\Token \mapsto \QuantityPM)
-      & \text{a positive or negative value}
-      \\
       \var{isf}
       & \IsFee
       & \ForFee \uniondistinct \NForFee
@@ -116,9 +112,9 @@ except for the following changes:
       & \TxId \times \Ix
       & \text{UTxO entry reference}
       \\
-      \var{(\var{hashscr_v}, \var{script_d},\var{script_r},\var{exunits})}
+      \var{(\var{script_d},\var{script_r},\var{exunits})}
       & \Info
-      & \HashScr \times \ScriptD \times \ScriptR \times \ExUnits
+      & \ScriptD \times \ScriptR \times \ExUnits
       & \text{validation data}
       \\
       (\var{txid}, \var{ix}, \var{inf})
@@ -157,18 +153,18 @@ except for the following changes:
       & \text{reward withdrawal}
       \\
       \var{h \mapsto (hashscr_v,exunits)}
-      & \ValSR
+      & \VldSR
       & \HashScr \mapsto (\Script \times \ExUnits)
       & \text{hash and validator with no data or redeemer}
       \\
       \var{h \mapsto hashscr_v}
-      & \ValOut
+      & \VldOut
       & \HashScr \mapsto \Script
       & \text{hash and validator for output}
       \\
       \var{val}
-      & \Vals
-      & \ValOut \uniondistinct \ValSR
+      & \Vlds
+      & \VldOut \uniondistinct \VldSR
       & \text{hash and validator}
     \end{array}
   \end{equation*}
@@ -221,8 +217,11 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
 \begin{itemize}
   \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
-  where the first slot is accessed by $\fun{txlst}$. The body now also includes
-  a finite map lookup $\Vals$ to avoid having multiple
+  where the first slot is accessed by $\fun{txlst}$.
+  \item $\TxBody$ now includes $\Value$, which represents
+  the tokens forged and taken out of circulation by the transaction
+  \item Not as part of the body, the transaction now also includes
+  a finite map lookup $\Vlds$ to avoid having multiple
   copies of the validator (one for each input spending from that script).
   \item $\HashDat \mapsto \Data$ is a similar lookup for data scripts.
   The full data script is now optional to include in a transaction when
@@ -232,8 +231,6 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   provided the block that contained it is still available to the spender.
   Supplying the full data script increases the size of the transaction and
   thus the fees.
-  \item $\TxBody$ now includes $\ValuePM$, which represents
-  the tokens forged and taken out of circulation by the transaction
   \item $\TxValTag$ is now part of the $\Tx$ type. This is a tag that is
   set by the slot leader submitting the block containing this transaction.
   It can later be used to re-apply blocks without performing script validation
@@ -241,7 +238,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
   are included. Scripts are handled separately.
   \item $\fun{txinputs}$ type changed to map to $\TxInTx$
-  \item $~\fun{txlst},~\fun{val},~\fun{addr},~\fun{txlst},~\fun{txvals},~\fun{txdats},
+  \item $~\fun{txlst},~\fun{getValue},~\fun{getAddr},~\fun{txlst},~\fun{txvlds},~\fun{txdats},
   ~\fun{forged}$
   accessor functions added
 \end{itemize}
@@ -255,9 +252,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Coin \times \ValuePM \times (\Slot\times\Slot) \\
-    &~& \times \Vals \times (\HashDat \mapsto \Data)
-    \times \Wdrl \times \Update
+      \times \Coin \times \Value \times (\Slot\times\Slot) \\
+    & ~& \times \Wdrl \times \Update
   \end{align*}
   %
   \begin{equation*}
@@ -266,7 +262,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \\
       \var{tx}
       & \Tx
-      & \TxBody \times \TxWitness \times \TxValTag
+      & \TxBody \times \TxWitness \times \Vlds \times (\HashDat \mapsto \Data) \times \TxValTag
     \end{array}
   \end{equation*}
   %
@@ -275,12 +271,12 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     \begin{array}{r@{~\in~}lr}
       \fun{txinputs} & \Tx \to \powerset{\TxInTx} & \text{transaction inputs} \\
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
-      \fun{val} & \TxOut \to \Value & \text{output value} \\
-      \fun{addr} & \TxOut \to \Addr & \text{output address} \\
+      \fun{getValue} & \TxOut \to \Value & \text{output value} \\
+      \fun{getAddr} & \TxOut \to \Addr & \text{output address} \\
       \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
-      \fun{txvals} & \Tx \to \Vals & \text{validator scripts}\\
+      \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
-      \fun{forged} & \Tx \to \ValuePM & \text{value forged by tx}\\
+      \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
@@ -293,7 +289,8 @@ processing transaction data for validation.
 
 \begin{itemize}
   \item $\fun{adaID},~\fun{adaToken},~\fun{qu},~\fun{coi},~\fun{adaVal}$ are used
-  for converting between Ada and other currencies
+  for converting between Ada and other currencies. $\Quantity$ and $\Coin$
+  must both be of the same underlying type to be able to convert between them.
   \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
   abstract functions.
   \item $\fun{adaVal}$ is used to create a value term from a coin Ada amount
@@ -337,7 +334,7 @@ processing transaction data for validation.
     & \text{build pending Tx input} \\~\\
     & \fun{mkIns} \in \Tx \to \UTxO \to \powerset{\PendingTxIn} \\
     & \fun{mkIns}~\var{tx}~\var{utxo} = \\
-    & ~~\{ \fun{pendingTxIn}~\var{txin}~(\fun{val}~\var{txout}) ~\vert~ \var{txin} \mapsto \var{txout}
+    & ~~\{ \fun{pendingTxIn}~\var{txin}~(\fun{getValue}~\var{txout}) ~\vert~ \var{txin} \mapsto \var{txout}
     \in \fun{txins}~\var{tx} \restrictdom \var{utxo}\} \\
     & \text{build pending Tx inputs} \\~\\
     & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInSRC \to \PendingTx \\
@@ -384,21 +381,19 @@ takes a term of type $\ExUnits$ as a parameter and perform validation
     & \text{resource-restricted validation of a multi-sig script} \\~\\
     & \fun{valPLCupTo} \in \ScriptPlutus\to (\Data \times \Data \times \Data \times
     \ExUnits) \to \Bool \\
-    & \text{resource-restricted validation of a Plutus script} \\~\\
-    & \fun{valScriptUpTo} \in \Script\to (\Data \times \Data \times \Data \times \ExUnits)
-    \to\Bool \\
+    & \text{resource-restricted validation of a Plutus script}
   \end{align*}
   %
   \emph{Notation}
   %
   \begin{align*}
-    \llbracket \var{script_v} \rrbracket_{\var{exunits}} (\var{script_d}~\var{script_r}~\var{ptx})
-    &=& \fun{valPLCupTo} ~\var{script_v} ~ \var{script_d}~\var{script_r}~\var{ptx}~
-    \var{exunits}
+    \llbracket \var{script_v} \rrbracket_{\var{exunits}} (\var{script_d},~\var{script_r},~\var{ptx})
+    &=& \fun{valPLCupTo} ~\var{script_v}~(\var{script_d},~\var{script_r},~\var{ptx},~
+    \var{exunits})
     \nextdef
     \llbracket \var{script_v} \rrbracket_{\var{exunits}} ~\var{ptx}
-    &=& \fun{valMSIGupTo} ~\var{script_v} ~ (\var{\Nothing}~\var{\Nothing}~\var{ptx}~
-    \var{exunits}) \\
+    &=& \fun{valPLCupTo} ~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
+    \var{exunits} \\
     &=& \fun{valMSIGupTo} ~\var{script_v} ~\var{ptx}~
     \var{exunits}
   \end{align*}

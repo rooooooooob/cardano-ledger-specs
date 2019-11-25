@@ -11,7 +11,7 @@ given in Figure \ref{fig:functions:insouts}. These include
 
 \begin{itemize}
   \item The function $\fun{txinputs_{vf}}$ returns only the inputs selected to be used
-for paying script execution fees
+for paying transaction fees
   \item The function $\fun{txinputs_s}$ returns only script transaction inputs
   \item The function $\fun{txins}$ that returns $\TxIn$ part of both script
   and non-script transaction inputs.
@@ -98,7 +98,7 @@ The changes due to Plutus integration are as follows:
     & \fun{ubalance} \in \UTxO \to \Value
     & \text{UTxO balance} \\
     & \fun{ubalance} ~ utxo = \sum_{\wcard\mapsto\var{q}\in~\var{utxo}}
-    \fun{val}~\var{q} \\
+    \fun{getValue}~\var{q} \\
     \nextdef
     & \fun{wbalance} \in \Wdrl \to \Coin
     & \text{withdrawal balance} \\
@@ -162,14 +162,14 @@ related to script fees.
     & \fun{scriptFees} ~\var{pp}~\var{tx}~=~\\
     &  ~~\sum_{\substack{(\wcard,(\wcard,\wcard,\wcard,~\var{exunits}))
       \in(\fun{txinputs_s} ~tx) \\
-      \cup (\wcard \mapsto (\wcard,\var{exunits}) \in \fun{txvals}~{tx})}}
+      \cup (\wcard \mapsto (\wcard,\var{exunits}) \in \fun{txvlds}~{tx})}}
       \fun{scriptFee} ~\var{pp}~ \var{exunits}
     \nextdef
     & \fun{allValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all scripts in a tx validate} \\
     & \fun{allValidate}~{utxo}~{tx}~=~
-    \fun{allCertValidate}~{utxo}~{tx} + \fun{allWDRLSValidate}~{utxo}~{tx} \\
-    & ~~ + \fun{allInsValidate}~{utxo}~{tx} \\
+    \fun{allCertValidate}~{utxo}~{tx} \wedge \fun{allWDRLSValidate}~{utxo}~{tx} \\
+    & ~~ \wedge \fun{allInsValidate}~{utxo}~{tx} \\
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script1}
@@ -198,7 +198,7 @@ verifications:
 the certificate witness, or the payment credential part of a UTxO address
 
 * the corresponding
-full validator is looked up (by hash value) in the finite map $\fun{txvals}$ in the
+full validator is looked up (by hash value) in the finite map $\fun{txvlds}$ in the
 body of the transaction, and must hash to the value by which it is indexed
 
 \item the data script, which is included in the script input
@@ -235,49 +235,50 @@ calculated by the $\fun{scriptFees}$ function).
     & \fun{allCertValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all certificate witnessing scripts in a tx validate} \\
     & \fun{allCertValidate}~{utxo}~{tx}~=~ \\
-    & ~~\forall~cert \in
+    & ~~\forall~\var{cert} \in
     (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
-    &~~\forall~h\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvals}~{tx}, \\
+    &~~\forall~h\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~h) \\
     & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{regCred}~\var{cert}\restrictdom\fun{txvals}~{tx} \vert = 1 \\
+    & ~~  \vert \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx} \vert = 1 \\
     %
     \nextdef
     & \fun{allWDRLSValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
     & \fun{allWDRLSValidate}~{utxo}~{tx}~=~ \\
     & ~~\forall~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
-    & ~~ \forall~ h\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~ \forall~ h\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
       (h,\fun{adaVal}~c))) \\
     & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx} \vert = 1 \\
+    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx} \vert = 1 \\
     %
     \nextdef
     & \fun{allInsValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
     & \fun{allInsValidate}~{utxo}~{tx}~=~ \\
-    & ~~(\forall~(txid,ix,((a,v),\var{script_d},\var{script_r},\var{exunits})) \in
+    & ~~(\forall~(txid,ix,(\var{script_d},\var{script_r},\var{exunits})) \in
     \fun{txinputs_s}~\var{tx}, \\
-    & ~~\forall ~h\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
-    & ~~ \forall~(txid,ix) \mapsto ((a,v),hashscr_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~ \var{hashscr_d} = \fun{hashData}~\var{script_d} ~\wedge~ \\
+    & ~~ \forall~(txid',ix') \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~\forall ~\var{h_v}\mapsto \var{script_v}\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx}, \\
+    & ~~ h_d = \fun{hashData}~\var{script_d} ~\wedge~ \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r},
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      ((txid,ix),h,\fun{hashData}~{script_r},v))) \\
-    &~~ \wedge~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx} \vert = 1) ~\wedge~ \\~\\
+      ((txid,ix),h_v,\fun{hashData}~{script_r},v))) \\
+    &~~ \wedge~ h_v = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \var{(txid,ix)}~=~\var{(txid',ix')}\\
+    & ~~ \wedge~ h_v~\in \fun{dom}( \fun{txvlds}~{tx})) ~\wedge~ \\~\\
       %
-    & ~~(\forall~(txid,ix,(a,v)) \in \fun{txinputs_s}~\var{tx}, \\
-    & ~~\forall ~h\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx}, \\
+    & ~~(\forall~(txid,ix) \in \fun{txinputs_s}~\var{tx}, \\
+    & ~~\forall ~h\mapsto (\var{script_v},\var{exunits})\in
+     \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
     & ~~\forall ~(txid,ix) \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
       ((txid,ix),h,v) \\
     & ~~ \wedge~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvals}~{tx} \vert = 1) \\
+    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx} \vert = 1) \\
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script2}
@@ -516,7 +517,7 @@ the UTXOS transition in the precondition.
       \\
       ~
       \\
-      \forall (\_\mapsto (\_, c)) \in \txouts{tx}, c \geq 0
+      \forall (\_\mapsto (\_, (\wcard \mapsto (\wcard \mapsto q)))) \in \txouts{tx}, q \geq 0
       \\
       \fun{txsize}~{tx}\leq\fun{maxTxSize}~\var{pp}
       \\
@@ -637,7 +638,7 @@ predicate.
       \powerset{\KeyHash}
     & \text{required key hashes} \\
     &  \hspace{-0.8cm}\fun{witsVKeyNeeded}~\var{utxo}~\var{tx}~\var{dms} = \\
-    & ~~\{ \fun{paymentHK}~\fun{addr}~{txout} \mid i \mapsto \var{txout} \in \var{utxo},~i\in\fun{txinsVKey}~{tx} \} \\
+    & ~~\{ \fun{paymentHK}~\fun{getAddr}~{txout} \mid i \mapsto \var{txout} \in \var{utxo},~i\in\fun{txinsVKey}~{tx} \} \\
     \cup & ~~
            \{\fun{stakeCred_r}~a\mid a\mapsto \wcard \in \AddrRWDVKey
       \restrictdom \txwdrls{tx}\}\\

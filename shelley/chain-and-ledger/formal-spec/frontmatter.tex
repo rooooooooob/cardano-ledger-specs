@@ -1,5 +1,6 @@
 \hypersetup{
-  pdftitle={Plutus Integration into the Formal Specification of the Cardano Ledger},
+  pdftitle={Formal Specification of the Cardano Ledger with Plutus
+  Integration},
   breaklinks=true,
   bookmarks=true,
   colorlinks=false,
@@ -11,26 +12,29 @@
   urlbordercolor={white}
 }
 
-\title{Plutus Integration into the Formal Specification of the Cardano Ledger}
+\title{Formal Specification of the Cardano Ledger with Plutus
+Integration}
 
 \author{
    Polina Vinogradova \\ {\small \texttt{polina.vinogradova@iohk.io}} \\
    }
 
-%\date{}
+\date{}
 
 \maketitle
 
 \begin{abstract}
-This document is a modification of the Shelley ledger specification
-(see~\cite{shelley_spec}) to support Plutus.
-It only includes those chapters of the original spec in which the
-rules or types were were modified for the purpose of Plutus
-integration, as well as background notation and type definitions necessary
-for presenting the Plutus-related changes.
+This document presents the modifications of the Shelley ledger
+specification
+(see~\cite{shelley_spec}) which will enable it to support Plutus.
+This specification is based on the Plutus system and the extended
+UTxO specification of the mockchain on which it operates
+(outlined in~\cite{plutus_eutxo}).
 
-This will soon be converted into a stand-alone document once it is more 
-clear how to separate out the Plutus-specific definitions.
+We present a unified way to process Plutus and scripts multisig scripts
+(see~\cite{multi_sig}). This formal specification also includes native multicurrency support,
+as defined in
+~\cite{multi_currency} and~\cite{formal_multicur}.
 \end{abstract}
 
 \section*{List of Contributors}
@@ -42,4 +46,5 @@ Michal Peyton Jones,
 Jann Mueller,
 Jared Corduan,
 Matthias Gudemann,
-Manuel Chakravarty
+Manuel Chakravarty,
+Kevin Hammond

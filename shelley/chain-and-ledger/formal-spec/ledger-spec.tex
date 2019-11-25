@@ -1,4 +1,7 @@
 \documentclass[11pt,a4paper,dvipsnames]{article}
+\usepackage[deliverable]{IOHKCoverPage}
+
+
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{iohk}
 \usepackage{microtype}
@@ -30,6 +33,23 @@
 %% Setup for the semantic package
 \setpremisesspace{20pt}
 
+% data for Deliverable header -- added by KH from an EU H2020 project template
+\DeliverableNumber{SL-D6}
+\DeliverableTitle{A Formal Specification of the Cardano Ledger with Plutus
+Integration}{Formal Cardano Ledger with Plutus Spec.}
+\DeliverableResponsible{Formal Methods Team}
+%\EditorName{Jared Corduan, \IOHK}
+\Authors{
+   Polina Vinogradova \quad \texttt{polina.vinogradova@iohk.io}
+}
+%\DueDate{15$^{\textrm{th}}$ October 2019}
+%\SubmissionDate{8th October 2019}{2019/10/08}
+\LeaderName{Philipp Kant, \IOHK}
+\InstitutionAddress{\IOHK}
+\Version{0.2}
+\Project{Shelley Ledger}
+\DisseminationDR
+
 %%
 %% Types
 %%
@@ -42,9 +62,9 @@
 \newcommand{\Rnn}{\ensuremath{\mathbb{R}^{\geq 0}}}
 \newcommand{\Tx}{\type{Tx}}
 \newcommand{\TxBody}{\type{TxBody}}
-\newcommand{\ValSR}{\type{ValSR}}
-\newcommand{\ValOut}{\type{ValOut}}
-\newcommand{\Vals}{\type{Vals}}
+\newcommand{\VldSR}{\type{VldSR}}
+\newcommand{\VldOut}{\type{VldOut}}
+\newcommand{\Vlds}{\type{Vlds}}
 \newcommand{\TxWitness}{\type{TxWitness}}
 \newcommand{\Ix}{\type{Ix}}
 \newcommand{\TxId}{\type{TxId}}
