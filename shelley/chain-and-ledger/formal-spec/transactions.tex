@@ -10,17 +10,22 @@ except for the following changes:
   \item $\Coin,~\CurrencyId,~\Token,~\Quantity$ are all types
   related to native multicurrency on the ledger.
 
-  \item $\ForFee$ and $\NForFee$: These are tags used to sort public key
-  spending inputs in a transaction into those used to pay script validation
-  fees and those not used
-  for fees. $\IsFee$ represents either.
+  \item $\Yes$ and $\Nope$: These are single-value types used in tags. These
+  values are used instead of booleans for clarity.
 
   \item $\ScriptPlutus$ and $\ScriptMSig$ are two types of scripts this spec
   covers validation of
 
-  \item $\ValTag$ and $\InValTag$: These are tags used to indicate if all scripts
-  in a transaction are expected to validate.
-  $\TxValTag$ represents either.
+  \item $\IsFee$ is a tag that indicates when an input has been marked
+  to be used for paying transaction fees ($\Yes$ for when it is for fees,
+  $\Nope$ when it is not).
+
+  \item $\IsValidating$ is a tag that indicates when a transaction is
+  expected to have all the scripts inside it validate.
+  This value is added by the slot leader when
+  constructing a block, and checked when a node runs all the scripts.
+  $\Yes$ for when it is for when all scripts will validate,
+  $\Nope$ is for when one of them does not.
 
   \item $\Data$: is the type of all arguments passed to the validator script.
 
@@ -47,11 +52,12 @@ except for the following changes:
   as well as special output types for PK and script outputs. The script output
   includes a data script hash.
 
-  \item $\VldSR,~\VldOut,~\Vlds$ are types which are finite maps for looking up
+  \item $\Vlds$ are types which are finite maps for looking up
   validator scripts by hashes. The scripts witnessing reward withdrawals and
-  scripts
+  certificates
   do not have an input containing the execution cost, so the execution cost
-  is paired with the hash in the $\VldSR$ type for such scripts.
+  is paired with the hash in for such scripts. These are the cases the in which we
+  will have a non-$\Nothing$ value for $\ExUnits$.
 \end{itemize}
 
 
@@ -64,12 +70,10 @@ except for the following changes:
       \var{curid} & \CurrencyId & \text{currency id}\\
       \var{tok} & \Token & \text{token identifier}\\
       \var{quan} & \Quantity & \text{quantity of a token}\\
-      \var{f} & \ForFee & \text{inputs intended for script fees} \\
-      \var{nf} & \NForFee & \text{inputs not for script fees} \\
       \var{plc} & \ScriptPlutus & \text{Plutus scripts} \\
       \var{msig} & \ScriptMSig & \text{Multisig scripts} \\
-      \var{vt} & \InValTag & \text{transaction valid tag} \\
-      \var{ivt} & \ValTag & \text{transaction invalid tag} \\
+      \var{yes} & \Yes & \text{tag type for yes} \\
+      \var{no} & \Nope & \text{tag type for no} \\
     \end{array}
   \end{equation*}
   \emph{Script types}
@@ -77,7 +81,7 @@ except for the following changes:
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
       \var{scr} & \Script & \ScriptPlutus \uniondistinct \ScriptMSig \\
-      \var{tvtag} & \TxValTag & \ValTag \uniondistinct \InValTag \\
+      \var{isv} & \IsValidating & \Yes \uniondistinct \Nope \\
       \var{dat}
       & \Data
       & \Nothing \uniondistinct \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
@@ -100,72 +104,62 @@ except for the following changes:
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
       \var{val} & \Value
       & \CurrencyId \mapsto (\Token \mapsto \Quantity)
-      & \text{a collection of tokens}
+%      & \text{a collection of tokens}
       \\
       \var{isf}
       & \IsFee
-      & \ForFee \uniondistinct \NForFee
-      & \text {tag for inputs used to pay script fees}
+      & \Yes \uniondistinct \Nope
+%      & \text {tag for inputs used to pay script fees}
       \\
       (\var{txid}, \var{ix})
       & \type{TxIn}
       & \TxId \times \Ix
-      & \text{UTxO entry reference}
+%      & \text{UTxO entry reference}
       \\
       \var{(\var{script_d},\var{script_r},\var{exunits})}
       & \Info
       & \ScriptD \times \ScriptR \times \ExUnits
-      & \text{validation data}
+%      & \text{validation data}
       \\
       (\var{txid}, \var{ix}, \var{inf})
       & \type{TxInScr}
       & \TxIn \times \Info
-      & \text{script input}
+%      & \text{script input}
       \\
       \var{txin}
       & \TxInTx
       & (\TxIn \times \IsFee) \uniondistinct \TxInScr
-      & \text{transaction input}
+%      & \text{transaction input}
       \\
       (\var{addr}, v)
       & \type{TxOutVK}
       & \Addr \times \Value
-      & \text{vk address output}
+%      & \text{vk address output}
       \\
       (\var{addr}, v, \var{hashscr_d})
       & \type{TxOutScr}
       & \type{TxOutVK} \times \HashDat
-      & \text{script address output}
+%      & \text{script address output}
       \\
       \var{txout}
       & \TxOut
       & \TxOutVK \uniondistinct \TxOutScr
-      & \text{transaction outputs}
+%      & \text{transaction outputs}
       \\
       \var{utxo}
       & \UTxO
       & \TxIn \mapsto \TxOut
-      & \text{unspent tx outputs}
+%      & \text{unspent tx outputs}
       \\
       \var{wdrl}
       & \Wdrl
       & \AddrRWD \mapsto \Coin
-      & \text{reward withdrawal}
-      \\
-      \var{h \mapsto (hashscr_v,exunits)}
-      & \VldSR
-      & \HashScr \mapsto (\Script \times \ExUnits)
-      & \text{hash and validator with no data or redeemer}
-      \\
-      \var{h \mapsto hashscr_v}
-      & \VldOut
-      & \HashScr \mapsto \Script
-      & \text{hash and validator for output}
+%      & \text{reward withdrawal}
       \\
       \var{val}
       & \Vlds
-      & \VldOut \uniondistinct \VldSR
-      & \text{hash and validator}
+      & \HashScr \mapsto (\Script \times \ExUnits^?)
+%      & \text{hash and validator}
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system}
@@ -231,14 +225,15 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   provided the block that contained it is still available to the spender.
   Supplying the full data script increases the size of the transaction and
   thus the fees.
-  \item $\TxValTag$ is now part of the $\Tx$ type. This is a tag that is
+  \item $\IsValidating$ is now part of the $\Tx$ type. This is a tag that is
   set by the slot leader submitting the block containing this transaction.
   It can later be used to re-apply blocks without performing script validation
   again.
   \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
   are included. Scripts are handled separately.
   \item $\fun{txinputs}$ type changed to map to $\TxInTx$
-  \item $~\fun{txlst},~\fun{getValue},~\fun{getAddr},~\fun{txlst},~\fun{txvlds},~\fun{txdats},
+  \item $~\fun{txlst},~\fun{getValue},~\fun{getAddr}, ~\fun{getDataHash},
+  ~\fun{txlst},~\fun{txvlds},~\fun{txdats},
   ~\fun{forged}$
   accessor functions added
 \end{itemize}
@@ -262,7 +257,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \\
       \var{tx}
       & \Tx
-      & \TxBody \times \TxWitness \times \Vlds \times (\HashDat \mapsto \Data) \times \TxValTag
+      & \TxBody \times \TxWitness \times \Vlds \times (\HashDat \mapsto \Data) \times \IsValidating
     \end{array}
   \end{equation*}
   %
@@ -273,7 +268,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
       \fun{getValue} & \TxOut \to \Value & \text{output value} \\
       \fun{getAddr} & \TxOut \to \Addr & \text{output address} \\
-      \fun{txvaltag} & \Tx \to \TxValTag & \text{transaction validation tag}\\
+      \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
+      \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
       \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
       \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
@@ -392,10 +388,12 @@ takes a term of type $\ExUnits$ as a parameter and perform validation
     \var{exunits})
     \nextdef
     \llbracket \var{script_v} \rrbracket_{\var{exunits}} ~\var{ptx}
-    &=& \fun{valPLCupTo} ~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
-    \var{exunits} \\
-    &=& \fun{valMSIGupTo} ~\var{script_v} ~\var{ptx}~
-    \var{exunits}
+    &=& \begin{cases}
+    \fun{valPLCupTo} ~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
+    \var{exunits} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
+    \fun{valMSIGupTo} ~\var{script_v} ~\var{ptx}~
+    \var{exunits} & \text{if}~\var{script_v} \in \ScriptMSig
+      \end{cases}\\
   \end{align*}
   \caption{Script Validation, cont.}
   \label{fig:defs:functions-valid}

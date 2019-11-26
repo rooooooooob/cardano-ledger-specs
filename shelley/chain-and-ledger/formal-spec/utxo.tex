@@ -22,9 +22,10 @@ for paying transaction fees
   \begin{align*}
     & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn}
     & \text{tx VK inputs used for fees} \\
-    & \fun{txinputs_{vf}} ~tx~=~ \{ (txid,ix)~\vert~((txid,ix),isf) \in
+    & \fun{txinputs_{vf}} ~tx~= \\
+    &~~\{ (txid,ix)~\vert~((txid,ix),\var{isfee}) \in
     \fun{txinputs} ~tx\cap \TxIn,~
-     \var{isf}\in\ForFee\}
+     \var{isfee}\in\Yes\}
     \nextdef
     & \fun{txinputs_s} \in \Tx \to \powerset{\TxOutScr}
     & \text{tx script inputs} \\
@@ -77,45 +78,45 @@ The changes due to Plutus integration are as follows:
   %
   \emph{Helper Functions}
   \begin{align*}
-    & \fun{adaAll} \in \UTxO \to \Coin
-    & \text{sum total of the amount of Ada in all outputs} \\
+    & \fun{adaAll} \in \UTxO \to \Coin \\
     & \fun{adaAll}~{\var{utxo}} = \fun{coi}~
           (\sum  {\mathsf{adaToken}} \restrictdom {\mathsf{adaID}} \restrictdom
           \fun{ubalance}~\var{utxo}) \\
+    & \text{sum total of the amount of Ada in all outputs} \\
     \nextdef
-    & \fun{adaOnly} \in \UTxO \to \Coin
-    & \text{sum total of the amount of Ada-only outputs} \\
+    & \fun{adaOnly} \in \UTxO \to \Coin \\
     & \fun{adaOnly}~{\var{utxo}} = \\
     & ~~\begin{cases}
           \fun{coi}~{q} ~& \text{if}~\fun{ubalance}~\var{utxo} = \{\mathsf{adaID} \mapsto
           (\mathsf{adaToken} \mapsto \var{q})\} \\
           0 & \text{otherwise}
       \end{cases}\\
+    & \text{sum total of the amount of Ada-only outputs} \\
   \end{align*}
   %
   \emph{Main Calculations}
   \begin{align*}
-    & \fun{ubalance} \in \UTxO \to \Value
-    & \text{UTxO balance} \\
+    & \fun{ubalance} \in \UTxO \to \Value \\
     & \fun{ubalance} ~ utxo = \sum_{\wcard\mapsto\var{q}\in~\var{utxo}}
     \fun{getValue}~\var{q} \\
+    & \text{UTxO balance} \\
     \nextdef
-    & \fun{wbalance} \in \Wdrl \to \Coin
+    & \fun{wbalance} \in \Wdrl \to \Coin \\
+    & \fun{wbalance} ~ ws = \sum_{(\wcard\mapsto c)\in\var{ws}} c \\
     & \text{withdrawal balance} \\
-    & \fun{wbalance} ~ ws = \sum_{(\wcard\mapsto c)\in\var{ws}} c
     \nextdef
-    & \fun{consumed} \in \PParams \to \UTxO \to \StakeDelegs \to \Wdrl \to \Tx \to \Value
-    & \text{value consumed} \\
+    & \fun{consumed} \in \PParams \to \UTxO \to \StakeDelegs \to \Wdrl \to \Tx \to \Value \\
     & \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \\
     & ~~\ubalance{(\txins{tx} \restrictdom \var{utxo})} +
         \fun{adaVal}~(\fun{wbalance}~(\fun{txwdrls}~{tx}))~+~\fun{forged}~\var{tx} \\
     & ~~ + \fun{adaVal}~(\keyRefunds{pp}{stdelegs}{tx}) \\
+    & \text{value consumed} \\
     \nextdef
-    & \fun{produced} \in \PParams \to \StakePools \to \Tx \to \Value
-    & \text{value produced} \\
+    & \fun{produced} \in \PParams \to \StakePools \to \Tx \to \Value \\
     & \fun{produced}~\var{pp}~\var{stpools}~\var{tx} = \\
     &~~\ubalance{(\outs{tx})}
     + \fun{adaVal}~(\txfee{tx}) + \fun{adaVal}~(\deposits{pp}{stpools}~{(\txcerts{tx})})\\
+    & \text{value produced} \\
   \end{align*}
   \caption{Functions used in UTxO rules}
   \label{fig:functions:utxo}
@@ -237,23 +238,19 @@ calculated by the $\fun{scriptFees}$ function).
     & \fun{allCertValidate}~{utxo}~{tx}~=~ \\
     & ~~\forall~\var{cert} \in
     (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
-    &~~\forall~h\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx}, \\
+    &~~\forall~h_v\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~h) \\
-    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx} \vert = 1 \\
+    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~h_v)  \\
     %
     \nextdef
     & \fun{allWDRLSValidate} \in \UTxO \to \Tx \to \Bool \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
     & \fun{allWDRLSValidate}~{utxo}~{tx}~=~ \\
     & ~~\forall~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
-    & ~~ \forall~ h\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
+    & ~~ \forall~ h_v\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      (h,\fun{adaVal}~c))) \\
-    & ~~ \wedge ~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx} \vert = 1 \\
+      (h_v,\fun{adaVal}~c)))  \\
     %
     \nextdef
     & \fun{allInsValidate} \in \UTxO \to \Tx \to \Bool \\
@@ -261,24 +258,19 @@ calculated by the $\fun{scriptFees}$ function).
     & \fun{allInsValidate}~{utxo}~{tx}~=~ \\
     & ~~(\forall~(txid,ix,(\var{script_d},\var{script_r},\var{exunits})) \in
     \fun{txinputs_s}~\var{tx}, \\
-    & ~~ \forall~(txid',ix') \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~\forall ~\var{h_v}\mapsto \var{script_v}\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx}, \\
-    & ~~ h_d = \fun{hashData}~\var{script_d} ~\wedge~ \\
+    & ~~ \forall~\wcard \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~\forall ~\var{h_v}\mapsto (\var{script_v},\wcard)\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r},
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      ((txid,ix),h_v,\fun{hashData}~{script_r},v))) \\
-    &~~ \wedge~ h_v = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \var{(txid,ix)}~=~\var{(txid',ix')}\\
-    & ~~ \wedge~ h_v~\in \fun{dom}( \fun{txvlds}~{tx})) ~\wedge~ \\~\\
-      %
+      ((txid,ix),h_v,\fun{hashData}~{script_r},v))) ) \\
+    & ~~\wedge~ \\
     & ~~(\forall~(txid,ix) \in \fun{txinputs_s}~\var{tx}, \\
-    & ~~\forall ~h\mapsto (\var{script_v},\var{exunits})\in
+    & ~~ \forall~\wcard \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~\forall ~h_v\mapsto (\var{script_v},\var{exunits})\in
      \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
-    & ~~\forall ~(txid,ix) \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
     & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
     \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      ((txid,ix),h,v) \\
-    & ~~ \wedge~ h = ~\fun{hashScript}~\var{script_v}  ~\wedge~ \\
-    & ~~  \vert \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx} \vert = 1) \\
+      ((txid,ix),h_v,v)) \\
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script2}
@@ -310,7 +302,7 @@ is for the application of a transaction containing only
 validating scripts. It applies when:
 
 \begin{itemize}
-  \item The validity tag of the transaction is $\ValTag$
+  \item The validity tag of the transaction is $\Yes$
   (correponding predicate failure is \emph{BagValidationTag})
   \item All scripts (Plutus and multisig) in that transaction validate
   (correponding predicate failure is \emph{ScriptsDontValidate})
@@ -327,7 +319,7 @@ The $\mathsf{Scripts\mbox{-}NotVal}$ rule applies when
   \item validation fails
   for one of the scripts in the transaction (only one script validation may fail,
   since validation does not proceed after this). In this case,
-  \item The validation tag is $\InValTag$
+  \item The validation tag is $\Nope$
 \end{itemize}
 
 Its application results in the following state changes:
@@ -347,7 +339,7 @@ in the case of the UTXOS rule, motivates the
 slot leader to:
 
 \begin{itemize}
-  \item correctly apply of the $\TxValTag$ tag,
+  \item correctly apply of the $\IsValidating$ tag,
   \item include transactions that validate in every way
   \textit{except possibly 2nd step script validation failure}
   \item exclude any transactions that are invalid
@@ -375,7 +367,7 @@ will result in the funds being locked forever in the associated rewards account.
   \begin{equation}
     \inference[Scripts-Val]
     {
-    \fun{txvaltag}~\var{tx} \in \ValTag  &
+    \fun{txvaltag}~\var{tx} \in \Yes  &
     \fun{allValidate}~{utxo}~{tx}
     \\
     ~
@@ -429,7 +421,7 @@ will result in the funds being locked forever in the associated rewards account.
   \begin{equation}
     \inference[Scripts-NotVal]
     {
-    \fun{txvaltag}~\var{tx} \in \InValTag &
+    \fun{txvaltag}~\var{tx} \in \Nope &
     \neg (\fun{allValidate}~{utxo}~{tx} ) \\
     }
     {
@@ -477,6 +469,13 @@ as follows. The preconditions remain the same, with the following additions:
   \item the check that the execution units for a given script are less than
   the allowed maximum,
 
+  \item the check that the transaction contains all the required validator
+  scripts, and that the data scripts carried by the transaction inputs hash to the
+  data hashes stored in the corresponding UTxO entry
+
+  \item the check that the hash-indexed validator scripts in the transaction
+  indeed correspond to their hash indexes
+
   \item the check that the hash-indexed data scripts in the
   transaction indeed correspond to their hash indexes,
 
@@ -512,7 +511,19 @@ the UTXOS transition in the precondition.
       \\
       ~
       \\
-      \forall~\var{hashscr_d}\mapsto\var{scriptv_d}\in\fun{txdats}~{tx},
+      \forall~\var{(\var{txin},(script_d,\wcard,\wcard))}\in\fun{txinputs_s}~{tx}, \\
+      \forall \wcard \mapsto \var{txout} \in \var{txin}\restrictdom\var{utxo}, \\
+      \fun{validatorHash}~(\fun{getAddr}~\var{txout}) \in \fun{dom}~\fun{txvlds}~{tx} \\
+      \wedge ~\fun{hashData}~{script_d}~=~ \fun{getDataHash}~\var{txout}
+      \\
+      ~
+      \\
+      \forall~\var{hashscr_v}\mapsto(\var{script_v},\wcard)\in\fun{txvlds}~{tx},
+      \var{hashscr_v} = \fun{hashData}~\var{script_v}
+      \\
+      ~
+      \\
+      \forall~\var{hashscr_d}\mapsto\var{script_d}\in\fun{txdats}~{tx},
       \var{hashscr_d} = \fun{hashData}~\var{script_d}
       \\
       ~
