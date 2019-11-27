@@ -166,42 +166,31 @@ except for the following changes:
   \label{fig:defs:utxo-shelley-1}
 \end{figure*}
 
-The types for PendingTx are added in Figure \ref{fig:defs:utxo-pending}.
-These roughly match the types currently in the master plutus branch,
-with the exception that the "current input" is now represented by the type
-$\PendingTxInSRC$, which can accommodate not only the currently script input
-being validated, but also the cases when a certificate or a reward withdrawal
-is being validated.
+The types for $\ValidationData$ are added in Figure \ref{fig:defs:utxo-pending}.
+There is current item $\CurItem$, which represents either the current input being
+spent, the current certificated being validated, or the current reward
+withdrawal.
 
 \begin{figure*}[htb]
-  \emph{PendingTx Types}
+  \emph{Abstract Types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{ptxiv}
-      & \PendingTxInV
-      & \TxIn \times \Value
-      \\
-      \var{ptxis}
-      & \PendingTxInS
-      & \TxIn \times (\HashScr \times \HashDat) \times \Value
-      \\
-      \var{ptxrs}
-      & \PendingTxInSRC
-      & \PendingTxInS \uniondistinct (\HashScr \times \Value) \uniondistinct \HashScr
-      \\
-      \var{ptxi}
-      & \PendingTxIn
-      & \PendingTxInV \uniondistinct \PendingTxInS
-      \\
-      \var{ptx}
-      & \PendingTx
-      & \powerset{\PendingTxIn} \times  \powerset{\TxOut} \times \Coin \times
-      \PendingTxInSRC \times (\Slot\times\Slot)
-      \\
+      \var{vd}
+      & \ValidationData
+      & \text{Data which must be passed to a Plutus script}
     \end{array}
   \end{equation*}
-  \caption{Definitions used to make PendingTx}
+  \emph{ValidationData Types}
+  %
+  \begin{equation*}
+    \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
+      \var{cur}
+      & \CurItem
+      & \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
+    \end{array}
+  \end{equation*}
+  \caption{Definitions used to make ValidationData}
   \label{fig:defs:utxo-pending}
 \end{figure*}
 
@@ -290,7 +279,7 @@ processing transaction data for validation.
   \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
   abstract functions.
   \item $\fun{adaVal}$ is used to create a value term from a coin Ada amount
-  \item The other functions are needed for building $\PendingTx$
+  \item The other functions are needed for building $\ValidationData$
   ($\fun{validationData}$ builds it).
 \end{itemize}
 
@@ -310,8 +299,10 @@ processing transaction data for validation.
     & \text{compute script hash} \\
     \fun{hashData} \in & ~\Data \to \HashDat
     & \text{compute hash of data} \\
-    \fun{toData} \in & ~\PendingTx\to \Data
-    & \text{encode PendingTx as Data} \\
+    \fun{toData} \in & ~ \ValidationData\to \Data 
+    & \text{encode ValidationData as Data} \\
+    \fun{validationData} \in & \UTxO \to \Tx \to \CurItem \to \ValidationData
+    & \text{build ValidationData} \\
   \end{align*}
   \emph{Helper Functions}
   %
@@ -319,25 +310,6 @@ processing transaction data for validation.
     &\fun{adaVal} ~\in~ \Coin \to \Value \\
     &\fun{adaVal}~{c} ~=~ \mathsf{adaID} \mapsto (\mathsf{adaToken} \mapsto  \fun{qu}~c) \\
     & \text{make an Ada value term from a Coin} \\~\\
-    & \fun{pendingTxIn} \in \TxInTx \to \Value \to \PendingTxIn \\
-    & \fun{pendingTxIn}~\var{txin}~\var{c} = \\
-    & ~~\begin{cases}
-          (txin,~{hashscr_v},\fun{hashData}~{script_r},c)
-           & \text{if}~\var{txin} = ((txid,ix),(\var{hashscr_v}, \var{script_r},\wcard)) \in \TxInScr \\
-          ((txid,ix),c) & \text{if}~
-           \var{txin} = ((txid,ix),\wcard) \in (\TxIn \times \IsFee)
-      \end{cases}\\
-    & \text{build pending Tx input} \\~\\
-    & \fun{mkIns} \in \Tx \to \UTxO \to \powerset{\PendingTxIn} \\
-    & \fun{mkIns}~\var{tx}~\var{utxo} = \\
-    & ~~\{ \fun{pendingTxIn}~\var{txin}~(\fun{getValue}~\var{txout}) ~\vert~ \var{txin} \mapsto \var{txout}
-    \in \fun{txins}~\var{tx} \restrictdom \var{utxo}\} \\
-    & \text{build pending Tx inputs} \\~\\
-    & \fun{validationData} \in \UTxO \to \Tx \to \PendingTxInSRC \to \PendingTx \\
-    & \fun{validationData}~\var{utxo}~\var{tx}~\var{ptxrs} = \\ &
-    ~~ ((\fun{mkIns}~\var{tx}~\var{utxo}),\{ \var{txout}~\vert~ \var{ix} \mapsto \var{txout} \in \fun{txouts}~\var{tx}\},
-    \fun{txfee}~{tx},\var{ptxrs},(\fun{txlst}~{tx},\fun{txttl}~{tx})) \\
-    & \text{build PendingTx} \\
   \end{align*}
   \caption{Script Validation}
   \label{fig:defs:functions-helper}
