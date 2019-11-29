@@ -3,34 +3,16 @@
 
 The rules for the ledger depend on several parameters contained in the $\PParams$ type,
 defined in \cite{byron_ledger_spec}.
-The parameters are listed in Figure~\ref{fig:defs:protocol-parameters}.
 
-For Plutus integration, we have added the following abstract types:
+For Plutus integration, we have added the following abstract types
+(see Figure~\ref{fig:defs:protocol-parameters}):
 
 \begin{itemize}
-\item $\ExUnits$: represents units of execution of
-a script, i.e. quantifies the resources necessary to type-check
-and validate spending from a script. In the final implementation, this will
-be a vector of specific values, such as the number of $\beta$-reductions performed
-during validation, or the memory requirements for execution of a specific script. \\
-E.g. $\ExUnits = \mathsf{NumBetaReductions} \times \mathsf{MemoryUnits}$. \\~\\
-Note that we may have different constructors for plutus script execution cost
-parameters and other script execution cost parameters. For example, for
-multi-sig, we may want to use the size of the list of witnesses to
-choose from.
-
 \item $\CostMod$: a value of this type will contain coefficients used to calculate,
 given the resource
-consumption due to validating a given script (expressed by a term of type $\ExUnits$),
+consumption due to validating a given script,
 an Ada value which will be the fee a transaction must pay for on-chain
 validation of that script.
-In the final implementation this will likely be a vector representing the values
-(in Ada) of consuming a unit of each type of resource in $\ExUnits$.
-Continuing the example above, \\
-$(3,5) \in \CostMod$ \\
-means that 3 Ada is the price of performing one $\beta$-reduction, and
-5 Ada for a unit of memory. \\~\\
-Here we must match the different types of execution costs represented by $\ExUnits$
 \end{itemize}
 
 \begin{note}
@@ -44,8 +26,6 @@ We also added the following protocol parameters:
   \item $\var{costm}$: This is the cost model parameter. It can be updated by
   the usual protocol parameter update procedure if a decision is made that
   the value of consuming a unit of a particular resource has changed.
-
-  \item $\var{maxunits}$: The maximum allowed script execution resource use.
 \end{itemize}
 
 
@@ -54,7 +34,6 @@ We also added the following protocol parameters:
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \var{exunits} & \ExUnits & \text{units of script execution} \\
       \var{costm} & \CostMod & \text{coefficients for cost model} \\
     \end{array}
   \end{equation*}
@@ -64,7 +43,6 @@ We also added the following protocol parameters:
   \begin{equation*}
       \begin{array}{r@{~\in~}lr}
         \var{costm} \mapsto \CostMod & \PParams & \text{script exec cost model}\\
-        \var{maxunits} \mapsto \ExUnits & \PParams & \text{script exec resource use limit}\\
       \end{array}
   \end{equation*}
   %
@@ -72,28 +50,11 @@ We also added the following protocol parameters:
   %
   \begin{center}
     \fun{costm},
-    \fun{maxUnits}
   \end{center}
   %
   \caption{Definitions Used in Protocol Parameters}
   \label{fig:defs:protocol-parameters}
 \end{figure*}
 
-In Figure \ref{fig:defs:protocol-parameters-helpers}, we have updated the
-transaction minimum fee to include all the script validation fees it must pay.
-
-\begin{figure*}[htb]
-  \emph{Helper Functions}
-  %
-  \begin{align*}
-    \fun{minfee} & \in \PParams \to \Tx \to \Coin & \text{minimum fee}\\
-    \fun{minfee} & ~\var{pp}~\var{tx} =
-    (\fun{a}~\var{pp}) \cdot \fun{txSize}~\var{tx} + (\fun{b}~\var{pp})
-    + \fun{scriptFees}~{pp}~\var{tx}  
-  \end{align*}
-  %
-  \caption{Helper functions for the Protocol Parameters}
-  \label{fig:defs:protocol-parameters-helpers}
-\end{figure*}
 
 \clearpage

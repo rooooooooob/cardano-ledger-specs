@@ -125,52 +125,19 @@ The changes due to Plutus integration are as follows:
 \clearpage
 
 In the following Figure \ref{fig:functions:script1} we give the functions
-related to script fees.
+related to sequential script validation.
 
 \begin{itemize}
-  \item $\fun{scriptFee}$ calculates the fee a transaction must pay
-  for execution of a script (to spend from a script address).
-  The actual calculation is TBD. This fee is determined as a function of
-
-  * the execution units $\var{exunits}$, which is part of the data in
-  the $txin \in \TxInTx$ (the transaction input spending the script
-  UTxO entry it references). Recall that this is likely a vector of
-  the quantities of the different types of resources consumed during
-  validation (e.g. $\beta$-reductions, memory, etc.)
-
-  * the cost model $costm$ protocol parameter value that gives the cost
-  of using a unit of each of the types of resources which execution units is
-  made up of.
-
-  \item $\fun{scriptFees}$ adds up all the fees for all script validation
-  done by a transaction, including
-
-  * stake key deregistration certificates
-
-  * reward withdrawals
-
-  * script-locked output spending
+\item jhk
 \end{itemize}
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{scriptFee} \in \PParams \to \ExUnits \to \Coin \\
-    & \text{script spending cost calculation} \\
-    & \fun{scriptFee} ~\var{pp}~ \var{exunits} ~=~ \\
-    \nextdef
-    & \fun{scriptFees} \in \PParams \to \Tx \to \Coin \\
-    & \text{fees for all scripts in Tx} \\
-    & \fun{scriptFees} ~\var{pp}~\var{tx}~=~\\
-    &  ~~\sum_{\substack{(\wcard,(\wcard,\wcard,\wcard,~\var{exunits}))
-      \in(\fun{txinputs_s} ~tx) \\
-      \cup (\wcard \mapsto (\wcard,\var{exunits}) \in \fun{txvlds}~{tx})}}
-      \fun{scriptFee} ~\var{pp}~ \var{exunits}
-    \nextdef
-    & \fun{allValidate} \in \UTxO \to \Tx \to \Bool \\
-    & \text{check that all scripts in a tx validate} \\
-    & \fun{allValidate}~{utxo}~{tx}~=~
-    \fun{allCertValidate}~{utxo}~{tx} \wedge \fun{allWDRLSValidate}~{utxo}~{tx} \\
-    & ~~ \wedge \fun{allInsValidate}~{utxo}~{tx} \\
+    & \fun{mkScrLst} \in \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptV,\ScrInData)} \\
+    & \text{a list of all validators and corresponding input data} \\
+    & \fun{mkScrLst} ~\var{pp}~\var{tx}~ \var{utxo} ~=~
+    \fun{toList}~(\fun{allCertScrts}~\var{pp}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~\var{pp}~{utxo}~{tx} \\
+    & ~~ \cup \fun{allInsScrts}~\var{pp}~{utxo}~{tx}) \\
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script1}
@@ -180,19 +147,19 @@ In Figure \ref{fig:functions:script2}, we give the three functions
 used for script validation for a given transaction,
 
 \begin{itemize}
-\item $\fun{allCertValidate}$ verifies that all script witnesses of certificates
-validate (this refers only to stake deregistration certificates, as these are the
-only kind that could have script witnesses)
-\item $\fun{allWDRLSValidate}$ verifies that all withdrawals from script reward
-addresses are validated
-\item $\fun{allInsValidate}$ verifies that all UTxO entry spending from scripts
-is validated
+\item $\fun{allCertScrts}$ returns the set of all the validators for the
+key deregistration certificates, together
+wtih the data needed for validation
+\item $\fun{allWDRLSScrts}$ returns the set of all the validators locking
+the script-address reward addresses together
+wtih the data needed for validation
+\item $\fun{allInsScrts}$ returns the set of all the validators locking
+the script-address UTxO's together
+wtih the data needed for validation
 \end{itemize}
 
-Each validation computation returns $\mathsf{True}$ upon completing
-the validation constrained by the resource limitations listed in $\var{exunits}$.
-There are several pieces of data from different sources involved in these
-verifications:
+There are several pieces of data from different sources involved in building these
+sets:
 
 \begin{itemize}
 \item the hash of the validator script, which is either the reward address,
@@ -210,8 +177,6 @@ this transaction input
 \item the redeemer script, provided in full as part of a script-spending
 transaction input
 
-\item the execution units, also provided in the input
-
 \item the $\Value$ of the UTxO entry being spent, or the coin value associated
 with reward address
 \end{itemize}
@@ -225,52 +190,49 @@ applied to the provided data and redeemer scripts in this case).
 This notational distinction is not necessary for certificates or reward withdrawals
 because neither allow for non-empty data and redeemer scripts.
 
-Note here that the wallet is responsible to determining the $\var{exunits}$ value
-by running the script itself to see how much resources it takes. It is then
+Note here that the wallet is responsible to determining the total price of the
+validation of all the scripts in a transaction
+by running the script itself to see how much resources it takes and doing the
+fee calculation using the cost parameters in protocol parameters. It is then
 also responsible for adding enough inputs to the transaction to cover the
-fees required for using the resources indicated in $\var{exunits}$ (as
-calculated by the $\fun{scriptFees}$ function).
+fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allCertValidate} \in \UTxO \to \Tx \to \Bool \\
+    & \fun{allCertScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{\ScriptV \times \ScrInData} \\
     & \text{check that all certificate witnessing scripts in a tx validate} \\
-    & \fun{allCertValidate}~{utxo}~{tx}~=~ \\
-    & ~~\forall~\var{cert} \in
-    (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
-    &~~\forall~\wcard\mapsto (\var{script_v},\var{exunits})\in \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~\var{cert})  \\
+    & \fun{allCertScrts}~{pp}~{utxo}~{tx}~=~ \\
+    & ~~\{ (\var{script_v},\fun{costm}~{pp}, \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~\var{cert})) ~\vert \\
+    & ~~\var{cert} \in (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
+    &~~\wcard\mapsto \var{script_v}\in \fun{regCred}~\var{cert}\restrictdom\fun{txvlds}~{tx}
+     \} \\
     %
     \nextdef
-    & \fun{allWDRLSValidate} \in \UTxO \to \Tx \to \Bool \\
+    & \fun{allWDRLSScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{\ScriptV\times\ScrInData} \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
-    & \fun{allWDRLSValidate}~{utxo}~{tx}~=~ \\
-    & ~~\forall~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
-    & ~~ \forall~ \wcard\mapsto (\var{script_v},\var{exunits})\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      (a\mapsto c)))  \\
+    & \fun{allWDRLSScrts}~{pp}~{utxo}~{tx}~=~ \\
+    & ~~\{ (\var{script_v},\fun{costm}~{pp},\fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      (a\mapsto c))) ~\vert \\
+    & ~~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
+    & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}\\
     %
     \nextdef
-    & \fun{allInsValidate} \in \UTxO \to \Tx \to \Bool \\
+    & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{\ScriptV\times\ScrInData} \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
-    & \fun{allInsValidate}~{utxo}~{tx}~=~ \\
-    & ~~(\forall~(txid,ix,(\var{script_d},\var{script_r},\var{exunits})) \in
+    & \fun{allInsScrts}~{pp}~{utxo}~{tx}~=~ \{ (\var{script_v},\fun{costm}~{pp}, (\var{script_d},\var{script_r}, \\
+    & ~~ \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      (txid,ix,(\var{script_d},\var{script_r}))))) ~\vert \\
+    & ~~(txid,ix,(\var{script_d},\var{script_r}) \in
     \fun{txinputs_s}~\var{tx}, \\
-    & ~~ \forall~\wcard \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~\forall ~\wcard\mapsto (\var{script_v},\wcard)\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits} (\var{script_d},\var{script_r},
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      (txid,ix,(\var{script_d},\var{script_r},\var{exunits})))) ) \\
-    & ~~\wedge~ \\
-    & ~~(\forall~(txid,ix) \in \fun{txinputs_s}~\var{tx}, \\
-    & ~~ \forall~\wcard \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~\forall ~\wcard\mapsto (\var{script_v},\var{exunits})\in
-     \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}, \\
-    & ~~ \llbracket \var{script_v} \rrbracket_{exunits}
-    \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
-      (txid,ix)) \\
+    & ~~\wcard \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx} \}\\
+    & ~~\cup~ \\
+    & ~~\{ (\var{script_v},\fun{costm}~{pp},\fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
+      (txid,ix))) ~\vert \\
+    & ~~(txid,ix) \in \fun{txinputs_s}~\var{tx}, \\
+    & ~~ \wcard \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~\wcard\mapsto \var{script_v}\in
+     \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script2}
@@ -278,17 +240,43 @@ calculated by the $\fun{scriptFees}$ function).
 
 Figure \ref{fig:ts-types:utxo-scripts} gives the transition system for the second phase of
 the two-phase script validation. The second phase requires actually running
-the scripts to see if they validate. This system has exactly the same
-signal, environment and state as the UTXO transition system. It is saparate
-from the UTXO system to isolate the second phase of script validation
+the scripts to see if they validate.
 
 \begin{figure}[htb]
+  \emph{Validation environment}
+  \begin{equation*}
+    \ValEnv =
+    \left(
+      \begin{array}{r@{~\in~}lr}
+        \var{slot} & \Slot & \text{current slot}\\
+        \var{pp} & \PParams & \text{protocol parameters}\\
+        \var{stkCreds} & \StakeCredential & \text{stake credential}\\
+        \var{stpools} & \StakePools & \text{stake pool}\\
+        \var{genDelegs} & \KeyHashGen\mapsto\KeyHash & \text{genesis key delegations} \\
+        \var{tx} & \Tx & \text{transaction being processed} \\
+      \end{array}
+    \right)
+  \end{equation*}
+  %
+  \emph{Validation state}
+  \begin{equation*}
+    \ValState =
+    \left(
+      \begin{array}{r@{~\in~}lr}
+        \var{utxo} & \UTxO & \text{UTxO}\\
+        \var{deposits} & \Coin & \text{deposits pot}\\
+        \var{fees} & \Coin & \text{fee pot}\\
+        \var{ups} & \UpdateState & \text{update state}\\
+        \var{remFee} & \Coin & \text{fee remaining to spend on validation} \\
+      \end{array}
+    \right)
+  \end{equation*}
   %
   \emph{Script transitions}
   \begin{equation*}
     \_ \vdash
     \var{\_} \trans{utxos}{\_} \var{\_}
-    \subseteq \powerset (\UTxOEnv \times \UTxOState \times \Tx \times \UTxOState)
+    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{\CurItem} \times \ValState)
   \end{equation*}
   %
   \caption{UTxO script validation types}
@@ -368,7 +356,7 @@ will result in the funds being locked forever in the associated rewards account.
     \inference[Scripts-Val]
     {
     \fun{txvaltag}~\var{tx} \in \Yes  &
-    \fun{allValidate}~{utxo}~{tx}
+    \var{remFee}~\geq~0
     \\
     ~
     \\
@@ -397,6 +385,7 @@ will result in the funds being locked forever in the associated rewards account.
       \var{stdelegs}\\
       \var{stpools}\\
       \var{dms}\\
+      \var{tx}\\
     \end{array}
       \vdash
       \left(
@@ -405,24 +394,30 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
+        \var{remFee}\\
       \end{array}
       \right)
-      \trans{utxos}{tx}
+      \trans{utxos}{\epsilon}
       \left(
       \begin{array}{r}
         \varUpdate{\var{(\txins{tx} \subtractdom \var{utxo}) \cup \outs{tx}}}  \\
         \varUpdate{\var{deposits} + \var{depositChange}} \\
         \varUpdate{\var{fees} + \txfee{tx} + \var{decayed}} \\
         \varUpdate{\var{ups'}} \\
+        \var{remFee}\\
       \end{array}
       \right) \\
     }
   \end{equation}
   \begin{equation}
-    \inference[Scripts-NotVal]
+    \inference[Scripts-Stop]
     {
+    (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket (\fun{snd}~{s})
+    \\
+    ~
+    \\
     \fun{txvaltag}~\var{tx} \in \Nope &
-    \neg (\fun{allValidate}~{utxo}~{tx} ) \\
+    (\var{remFee'}~<~0 ~ \lor ~ \var{isVal}\in \Nope)
     }
     {
     \begin{array}{l}
@@ -431,6 +426,7 @@ will result in the funds being locked forever in the associated rewards account.
       \var{stdelegs}\\
       \var{stpools}\\
       \var{dms}\\
+      \var{tx}\\
     \end{array}
       \vdash
       \left(
@@ -439,15 +435,94 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
+        \var{remFee}\\
       \end{array}
       \right)
-      \trans{utxos}{tx}
+      \trans{utxos}{s;\Gamma}
       \left(
       \begin{array}{r}
         \varUpdate{\var{\fun{txinputs_{vf}}~{tx} \subtractdom \var{utxo}}}  \\
         \var{deposits} \\
         \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}\restrictdom \var{utxo})} \\
         \var{ups} \\
+        \var{remFee}\\
+      \end{array}
+      \right)
+    }
+  \end{equation}
+  \begin{equation}
+    \inference[Scripts-Ind]
+    {
+    (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket (\fun{snd}~{s})
+    \\
+    ~
+    \\
+    (\var{remFee'}~\geq~0 ~ \wedge ~ \var{isVal}\in \Yes)
+    \\
+    ~
+    \\
+    {
+    \begin{array}{l}
+      \var{slot}\\
+      \var{pp}\\
+      \var{stdelegs}\\
+      \var{stpools}\\
+      \var{dms}\\
+      \var{tx}\\
+    \end{array}
+    }
+      \vdash
+      \left(
+      {
+      \begin{array}{r}
+        \var{utxo} \\
+        \var{deposits} \\
+        \var{fees} \\
+        \var{ups} \\
+        \var{remFee'}\\
+      \end{array}
+      }
+      \right)
+      \trans{utxos}{\Gamma}
+      \left(
+      {
+      \begin{array}{r}
+        \var{utxo} \\
+        \var{deposits} \\
+        \var{fees} \\
+        \var{ups} \\
+        \var{remFee''}\\
+      \end{array}
+      }
+      \right)
+    }
+    {
+    \begin{array}{l}
+      \var{slot}\\
+      \var{pp}\\
+      \var{stdelegs}\\
+      \var{stpools}\\
+      \var{dms}\\
+      \var{tx}\\
+    \end{array}
+      \vdash
+      \left(
+      \begin{array}{r}
+        \var{utxo} \\
+        \var{deposits} \\
+        \var{fees} \\
+        \var{ups} \\
+        \var{remFee}\\
+      \end{array}
+      \right)
+      \trans{utxos}{s;\Gamma}
+      \left(
+      \begin{array}{r}
+        \var{utxo} \\
+        \var{deposits} \\
+        \var{fees} \\
+        \var{ups} \\
+        \varUpdate{remFee'}\\
       \end{array}
       \right)
     }
@@ -465,9 +540,6 @@ as follows. The preconditions remain the same, with the following additions:
   that the value of the outputs corresponding to the inputs selected
   for paying script fees indeed covers the total fee amount (and does not
   include non-Ada tokens),
-
-  \item the check that the execution units for a given script are less than
-  the allowed maximum,
 
   \item the check that the transaction contains all the required validator
   scripts, and that the data scripts carried by the transaction inputs hash to the
@@ -506,11 +578,6 @@ the UTXOS transition in the precondition.
       \\
       ~
       \\
-      \forall~\var{(\wcard,(\wcard,\wcard,\var{exunits}))}\in\fun{txinputs_s}~{tx},
-      \var{exunits} \leq \fun{maxUnits}~\var{pp}
-      \\
-      ~
-      \\
       \forall~\var{(\var{txin},(script_d,\wcard,\wcard))}\in\fun{txinputs_s}~{tx}, \\
       \forall \wcard \mapsto \var{txout} \in \var{txin}\restrictdom\var{utxo}, \\
       \fun{validatorHash}~(\fun{getAddr}~\var{txout}) \in \fun{dom}~\fun{txvlds}~{tx} \\
@@ -534,6 +601,10 @@ the UTXOS transition in the precondition.
       \\
       ~
       \\
+      \var{sLst} := \fun{mkScrLst}~\var{pp}~\var{tx}~\var{utxo}
+      \\
+      ~
+      \\
       {
         \begin{array}{c}
           \var{slot}\\
@@ -541,6 +612,7 @@ the UTXOS transition in the precondition.
           \var{stdelegs}\\
           \var{stpools}\\
           \var{dms}\\
+          \var{tx}\\
         \end{array}
       }
       \vdash
@@ -551,10 +623,11 @@ the UTXOS transition in the precondition.
             \var{deposits} \\
             \var{fees} \\
             \var{ups}\\
+            \var{\txfee{tx}~-~\minfee{pp}{tx}}\\
           \end{array}
         \right)
       }
-      \trans{utxos}{\var{tx}}
+      \trans{utxos}{\var{sLst}}
       {
         \left(
           \begin{array}{r}
@@ -562,6 +635,7 @@ the UTXOS transition in the precondition.
             \var{deposits'} \\
             \var{fees'} \\
             \var{ups'}\\
+            \var{remFee'}\\
           \end{array}
         \right)
       }

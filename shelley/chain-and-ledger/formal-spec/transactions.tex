@@ -37,9 +37,7 @@ except for the following changes:
 
   \item $\Info$: is the additional information an input in a transaction must
   have when spending a script output. This includes the redeemer,
-  data, and
-  the resource consumption for validating spending the script output
-  , expressed as $\var{exunits}$.
+  data.
 
   \item $\TxInScr$: A transaction input spending a script output.
 
@@ -53,11 +51,7 @@ except for the following changes:
   includes a data script hash.
 
   \item $\Vlds$ are types which are finite maps for looking up
-  validator scripts by hashes. The scripts witnessing reward withdrawals and
-  certificates
-  do not have an input containing the execution cost, so the execution cost
-  is paired with the hash in for such scripts. These are the cases the in which we
-  will have a non-$\Nothing$ value for $\ExUnits$.
+  validator scripts by hashes.
 \end{itemize}
 
 
@@ -116,9 +110,9 @@ except for the following changes:
       & \TxId \times \Ix
 %      & \text{UTxO entry reference}
       \\
-      \var{(\var{script_d},\var{script_r},\var{exunits})}
+      \var{(\var{script_d},\var{script_r})}
       & \Info
-      & \ScriptD \times \ScriptR \times \ExUnits
+      & \ScriptD \times \ScriptR
 %      & \text{validation data}
       \\
       (\var{txid}, \var{ix}, \var{inf})
@@ -158,7 +152,7 @@ except for the following changes:
       \\
       \var{val}
       & \Vlds
-      & \HashScr \mapsto (\Script \times \ExUnits^?)
+      & \HashScr \mapsto \Script
 %      & \text{hash and validator}
     \end{array}
   \end{equation*}
@@ -169,7 +163,7 @@ except for the following changes:
 The types for $\ValidationData$ are added in Figure \ref{fig:defs:utxo-pending}.
 There is current item $\CurItem$, which represents either the current input being
 spent, the current certificated being validated, or the current reward
-withdrawal.
+withdrawal. $\ScrInData$ is all the input data for a script (either MSIG or PLC).
 
 \begin{figure*}[htb]
   \emph{Abstract Types}
@@ -188,6 +182,10 @@ withdrawal.
       \var{cur}
       & \CurItem
       & \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
+      \\
+      \var{sid}
+      & \ScrInData
+      & (\CostMod \times \Data) \uniondistinct (\CostMod \times \Data \times \Data \times \Data)
     \end{array}
   \end{equation*}
   \caption{Definitions used to make ValidationData}
@@ -237,7 +235,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
       \times \Coin \times \Value \times (\Slot\times\Slot) \\
-    & ~& \times \Wdrl \times \Update
+    & ~& \times~ \Wdrl \times \Update
   \end{align*}
   %
   \begin{equation*}
@@ -299,7 +297,7 @@ processing transaction data for validation.
     & \text{compute script hash} \\
     \fun{hashData} \in & ~\Data \to \HashDat
     & \text{compute hash of data} \\
-    \fun{toData} \in & ~ \ValidationData\to \Data 
+    \fun{toData} \in & ~ \ValidationData\to \Data
     & \text{encode ValidationData as Data} \\
     \fun{validationData} \in & \UTxO \to \Tx \to \CurItem \to \ValidationData
     & \text{build ValidationData} \\
@@ -321,9 +319,7 @@ are presented.
 
 \begin{itemize}
   \item $\fun{valMSIGupTo}$ performs validation for multi-sig scripts
-  (this does not require data or redeemer scripts). The abstract $\ExUnits$
-  type would be defined to have a MSIG constructor specifically to
-  measure msig-related resources.
+  (this does not require data or redeemer scripts).
   \item $\fun{valPLCupTo}$ performs validation for plutus scripts.
   \begin{note}
     these need to be defined still
@@ -332,8 +328,10 @@ are presented.
 
 These functions take their corresponding parameters (no data or redeemer
 scripts in the case of multisig). They also
-takes a term of type $\ExUnits$ as a parameter and perform validation
-\textit{limited by resources indicated by} $exunits$.
+takes a term of type $\Coin$ as a parameter and perform validation
+\textit{limited by resources indicated by} this value. They return a pair
+of the boolean validation result and the remaining funds available to pay
+for validation of the rest of the scripts in the transaction (if any).
 
 \begin{note}
   $\fun{valScriptUpTo}$  is the name of the function that replaces
@@ -345,26 +343,26 @@ takes a term of type $\ExUnits$ as a parameter and perform validation
   \emph{Script Validation Functions}
   %
   \begin{align*}
-    & \fun{valMSIGupTo} \in \ScriptMSig\to \Data \to \ExUnits \to\Bool \\
+    & \fun{valMSIGupTo} \in \CostMod \to\ScriptMSig\to \Data \to \Coin \to \Bool \times \Coin \\
     & \text{resource-restricted validation of a multi-sig script} \\~\\
-    & \fun{valPLCupTo} \in \ScriptPlutus\to (\Data \times \Data \times \Data \times
-    \ExUnits) \to \Bool \\
+    & \fun{valPLCupTo} \in \CostMod \to\ScriptPlutus\to (\Data \times \Data \times \Data \times
+    \Coin) \to \Bool \times \Coin \\
     & \text{resource-restricted validation of a Plutus script}
   \end{align*}
   %
   \emph{Notation}
   %
   \begin{align*}
-    \llbracket \var{script_v} \rrbracket_{\var{exunits}} (\var{script_d},~\var{script_r},~\var{ptx})
-    &=& \fun{valPLCupTo} ~\var{script_v}~(\var{script_d},~\var{script_r},~\var{ptx},~
-    \var{exunits})
+    \llbracket \var{script_v} \rrbracket_{\var{c},\var{cm}} (\var{script_d},~\var{script_r},~\var{ptx})
+    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~(\var{script_d},~\var{script_r},~\var{ptx},~
+    \var{c})
     \nextdef
-    \llbracket \var{script_v} \rrbracket_{\var{exunits}} ~\var{ptx}
+    \llbracket \var{script_v} \rrbracket_{\var{c},\var{cm}} ~\var{ptx}
     &=& \begin{cases}
-    \fun{valPLCupTo} ~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
-    \var{exunits} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
-    \fun{valMSIGupTo} ~\var{script_v} ~\var{ptx}~
-    \var{exunits} & \text{if}~\var{script_v} \in \ScriptMSig
+    \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
+    \var{c} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
+    \fun{valMSIGupTo} ~\var{cm}~\var{script_v} ~\var{ptx}~
+    \var{c} & \text{if}~\var{script_v} \in \ScriptMSig
       \end{cases}\\
   \end{align*}
   \caption{Script Validation, cont.}
