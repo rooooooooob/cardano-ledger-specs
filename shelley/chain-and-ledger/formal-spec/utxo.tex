@@ -199,7 +199,7 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allCertScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{\ScriptV \times \ScrInData} \\
+    & \fun{allCertScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV \times \ScrInData)} \\
     & \text{check that all certificate witnessing scripts in a tx validate} \\
     & \fun{allCertScrts}~{pp}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v},\fun{costm}~{pp}, \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~\var{cert})) ~\vert \\
@@ -208,7 +208,7 @@ fees required.
      \} \\
     %
     \nextdef
-    & \fun{allWDRLSScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{\ScriptV\times\ScrInData} \\
+    & \fun{allWDRLSScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
     & \fun{allWDRLSScrts}~{pp}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v},\fun{costm}~{pp},\fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
@@ -217,12 +217,12 @@ fees required.
     & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}\\
     %
     \nextdef
-    & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{\ScriptV\times\ScrInData} \\
+    & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
     & \fun{allInsScrts}~{pp}~{utxo}~{tx}~=~ \{ (\var{script_v},\fun{costm}~{pp}, (\var{script_d},\var{script_r}, \\
     & ~~ \fun{toData}(\fun{validationData}~\var{utxo}~\var{tx}~
       (txid,ix,(\var{script_d},\var{script_r}))))) ~\vert \\
-    & ~~(txid,ix,(\var{script_d},\var{script_r}) \in
+    & ~~(txid,ix,(\var{script_d},\var{script_r})) \in
     \fun{txinputs_s}~\var{tx}, \\
     & ~~\wcard \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
     & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx} \}\\

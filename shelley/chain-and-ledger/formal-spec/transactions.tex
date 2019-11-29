@@ -343,10 +343,10 @@ for validation of the rest of the scripts in the transaction (if any).
   \emph{Script Validation Functions}
   %
   \begin{align*}
-    & \fun{valMSIGupTo} \in \CostMod \to\ScriptMSig\to \Data \to \Coin \to \Bool \times \Coin \\
+    & \fun{valMSIGupTo} \in \CostMod \to\ScriptMSig\to \Data \to \Coin \to (\IsValidating \times \Coin) \\
     & \text{resource-restricted validation of a multi-sig script} \\~\\
     & \fun{valPLCupTo} \in \CostMod \to\ScriptPlutus\to (\Data \times \Data \times \Data \times
-    \Coin) \to \Bool \times \Coin \\
+    \Coin) \to (\IsValidating \times \Coin) \\
     & \text{resource-restricted validation of a Plutus script}
   \end{align*}
   %
