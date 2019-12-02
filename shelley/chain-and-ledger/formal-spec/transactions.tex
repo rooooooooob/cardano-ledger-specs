@@ -29,8 +29,8 @@ except for the following changes:
 
   \item $\Data$: is the type of all arguments passed to the validator script.
 
-  \item $\ScriptV,~ \ScriptR,~ \ScriptD$: are the types of the validator,
-  redeemer and data scripts.
+  \item $\ScriptV,~ \Rdmr,~ \DatVal$: are the types of the validator,
+  redeemer and data.
 
   \item $\Value$ is the multicurrency type used to represent
   both fungible and non fungible tokens
@@ -87,8 +87,8 @@ except for the following changes:
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\subset}lr}
       \var{script_v}&\ScriptV & \Script & \text{validator script}\\
-      \var{script_d}&\ScriptD & \Data & \text{data script}\\
-      \var{script_r}&\ScriptR & \Data & \text{redeemer script}\\
+      \var{dataval}&\DatVal & \Data & \text{data script}\\
+      \var{rdmr}&\Rdmr & \Data & \text{redeemer script}\\
     \end{array}
   \end{equation*}
 %
@@ -110,9 +110,9 @@ except for the following changes:
       & \TxId \times \Ix
 %      & \text{UTxO entry reference}
       \\
-      \var{(\var{script_d},\var{script_r})}
+      \var{(\var{dvhash},\var{rdhash})}
       & \Info
-      & \ScriptD \times \ScriptR
+      & \HashDat \times \HashDat
 %      & \text{validation data}
       \\
       (\var{txid}, \var{ix}, \var{inf})
@@ -160,22 +160,13 @@ except for the following changes:
   \label{fig:defs:utxo-shelley-1}
 \end{figure*}
 
-The types for $\ValidationData$ are added in Figure \ref{fig:defs:utxo-pending}.
+The types for passing to Plutus scripts are added in Figure \ref{fig:defs:utxo-pending}.
 There is current item $\CurItem$, which represents either the current input being
 spent, the current certificated being validated, or the current reward
 withdrawal. $\ScrInData$ is all the input data for a script (either MSIG or PLC).
 
 \begin{figure*}[htb]
-  \emph{Abstract Types}
-  %
-  \begin{equation*}
-    \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{vd}
-      & \ValidationData
-      & \text{Data which must be passed to a Plutus script}
-    \end{array}
-  \end{equation*}
-  \emph{ValidationData Types}
+  \emph{Validation Data Types}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
@@ -185,10 +176,11 @@ withdrawal. $\ScrInData$ is all the input data for a script (either MSIG or PLC)
       \\
       \var{sid}
       & \ScrInData
-      & (\CostMod \times \Data) \uniondistinct (\CostMod \times \Data \times \Data \times \Data)
+      & \Data \uniondistinct
+        (\Data \times \Data \times \Data)
     \end{array}
   \end{equation*}
-  \caption{Definitions used to make ValidationData}
+  \caption{Definitions used to make Validation Data}
   \label{fig:defs:utxo-pending}
 \end{figure*}
 
@@ -234,8 +226,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Coin \times \Value \times (\Slot\times\Slot) \\
-    & ~& \times~ \Wdrl \times \Update
+      \times \Coin \times \Coin \times \Value \\
+    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update
   \end{align*}
   %
   \begin{equation*}
@@ -244,7 +236,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \\
       \var{tx}
       & \Tx
-      & \TxBody \times \TxWitness \times \Vlds \times (\HashDat \mapsto \Data) \times \IsValidating
+      & \TxBody \times \TxWitness \times \Vlds \times (\HashDat \mapsto \Data)
+      \times \IsValidating
     \end{array}
   \end{equation*}
   %
@@ -256,10 +249,11 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{getValue} & \TxOut \to \Value & \text{output value} \\
       \fun{getAddr} & \TxOut \to \Addr & \text{output address} \\
       \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
+      \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
+      \fun{txscrfee} & \Tx \to \Coin & \text{portion of fee allocated for scripts}\\
       \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
       \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
-      \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
@@ -274,10 +268,9 @@ processing transaction data for validation.
   \item $\fun{adaID},~\fun{adaToken},~\fun{qu},~\fun{coi},~\fun{adaVal}$ are used
   for converting between Ada and other currencies. $\Quantity$ and $\Coin$
   must both be of the same underlying type to be able to convert between them.
-  \item $\fun{hashScript},~ \fun{hashData},~\fun{toData}$ are hashing and encoding
-  abstract functions.
+  \item $\fun{hashScript},~ \fun{hashData}$ are abstract hashing functions.
   \item $\fun{adaVal}$ is used to create a value term from a coin Ada amount
-  \item The other functions are needed for building $\ValidationData$
+  \item The other functions are needed for building validationd data
   ($\fun{validationData}$ builds it).
 \end{itemize}
 
@@ -297,10 +290,8 @@ processing transaction data for validation.
     & \text{compute script hash} \\
     \fun{hashData} \in & ~\Data \to \HashDat
     & \text{compute hash of data} \\
-    \fun{toData} \in & ~ \ValidationData\to \Data
-    & \text{encode ValidationData as Data} \\
-    \fun{validationData} \in & \UTxO \to \Tx \to \CurItem \to \ValidationData
-    & \text{build ValidationData} \\
+    \fun{validationData} \in & \UTxO \to \Tx \to \CurItem \to \Data
+    & \text{build Validation Data} \\
   \end{align*}
   \emph{Helper Functions}
   %
@@ -353,11 +344,11 @@ for validation of the rest of the scripts in the transaction (if any).
   \emph{Notation}
   %
   \begin{align*}
-    \llbracket \var{script_v} \rrbracket_{\var{c},\var{cm}} (\var{script_d},~\var{script_r},~\var{ptx})
-    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~(\var{script_d},~\var{script_r},~\var{ptx},~
+    \llbracket \var{script_v} \rrbracket_{\var{c},~\var{cm}}(\var{dataval},~\var{rdmr},~\var{ptx})
+    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~(\var{dataval},~\var{rdmr},~\var{ptx},~
     \var{c})
     \nextdef
-    \llbracket \var{script_v} \rrbracket_{\var{c},\var{cm}} ~\var{ptx}
+    \llbracket \var{script_v} \rrbracket_{\var{c},~\var{cm}} \var{ptx}
     &=& \begin{cases}
     \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
     \var{c} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
