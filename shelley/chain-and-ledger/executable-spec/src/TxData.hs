@@ -37,7 +37,7 @@ import           Coin (Coin)
 import           Keys (AnyKeyHash, pattern AnyKeyHash, GenKeyHash, Hash, KeyHash, Sig, VKey,
                      VKeyGenesis, VerKeyVRF, hashAnyKey)
 import           Ledger.Core (Relation (..))
-import           Slot (Epoch, Slot)
+import           Slot (EpochNo, SlotNo)
 import           Updates (Update, updateNull)
 import           Scripts
 import           Value
@@ -99,7 +99,7 @@ type Ix  = Natural
 
 -- | Pointer to a slot, transaction index and index in certificate list.
 data Ptr
-  = Ptr Slot Ix Ix
+  = Ptr SlotNo Ix Ix
   deriving (Show, Eq, Ord, Generic)
 
 instance NoUnexpectedThunks Ptr
@@ -176,7 +176,7 @@ data DCert crypto
     -- | A stake pool registration certificate.
   | RegPool (PoolParams crypto)
     -- | A stake pool retirement certificate.
-  | RetirePool (KeyHash crypto) Epoch
+  | RetirePool (KeyHash crypto) EpochNo
     -- | A stake delegation certificate.
   | Delegate (Delegation crypto)
     -- | Genesis key delegation certificate
@@ -195,7 +195,7 @@ data TxBody crypto
       , _certs    :: Seq (DCert crypto)
       , _wdrls    :: Wdrl crypto
       , _txfee    :: Coin
-      , _ttl      :: Slot
+      , _ttl      :: SlotNo
       , _txUpdate :: Update crypto
       } deriving (Show, Eq, Generic)
 
@@ -233,14 +233,14 @@ data Tx crypto
 instance Crypto crypto => NoUnexpectedThunks (Tx crypto)
 
 newtype StakeCreds crypto =
-  StakeCreds (Map (StakeCredential crypto) Slot)
+  StakeCreds (Map (StakeCredential crypto) SlotNo)
   deriving (Show, Eq, NoUnexpectedThunks)
 
-addStakeCreds :: (StakeCredential crypto) -> Slot -> (StakeCreds crypto) -> StakeCreds crypto
+addStakeCreds :: (StakeCredential crypto) -> SlotNo -> (StakeCreds crypto) -> StakeCreds crypto
 addStakeCreds newCred s (StakeCreds creds) = StakeCreds $ Map.insert newCred s creds
 
 newtype StakePools crypto =
-  StakePools (Map (KeyHash crypto) Slot)
+  StakePools (Map (KeyHash crypto) SlotNo)
   deriving (Show, Eq, NoUnexpectedThunks)
 
 
@@ -481,7 +481,7 @@ instance Crypto crypto
 
 instance Relation (StakeCreds crypto) where
   type Domain (StakeCreds crypto) = StakeCredential crypto
-  type Range (StakeCreds crypto)  = Slot
+  type Range (StakeCreds crypto)  = SlotNo
 
   singleton k v = StakeCreds $ Map.singleton k v
 
