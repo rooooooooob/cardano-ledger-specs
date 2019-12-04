@@ -54,9 +54,6 @@ The changes due to Plutus integration are as follows:
 \begin{itemize}
   \item $\fun{adaAll}$ adds up all the Ada in a UTxO
 
-  \item $\fun{adaOnly}$ adds up all Ada in a UTxO and returns 0 if there were
-  non-Ada tokens in it.
-
   \item
     The $\fun{ubalance}$ function calculates the (aggregated by currency ID and
     Token) sum total of all the value in a given UTxO.
@@ -68,11 +65,14 @@ The changes due to Plutus integration are as follows:
    to the transaction collecting deposit refunds.
 
   \item The $\fun{produced}$ calculation contains the fee a transaction pays
-  to the fee pot, the outputs it adds to the UTxO, and the deposits it makes
+  to the fee pot (this consists of the sum of two values, a transaction fee and a
+  fee for processing all the scripts inside it), the outputs it adds to the UTxO,
+  and the deposits it makes
   to the deposit pot (these are the same values as the ledger spec).
   The script execution costs are included in the transaction fee.
 \end{itemize}
 
+The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Coin$.
 
 \begin{figure}[htb]
   %
@@ -83,15 +83,6 @@ The changes due to Plutus integration are as follows:
           (\sum  \range ({\mathsf{adaToken}} \restrictdom \range ({\mathsf{adaID}} \restrictdom
           \fun{ubalance}~\var{utxo}))) \\
     & \text{sum total of the amount of Ada in all outputs} \\
-    \nextdef
-    & \fun{adaOnly} \in \UTxO \to \Coin \\
-    & \fun{adaOnly}~{\var{utxo}} = \\
-    & ~~\begin{cases}
-          \fun{coi}~{q} ~& \text{if}~\fun{ubalance}~\var{utxo} = \{\mathsf{adaID} \mapsto
-          (\mathsf{adaToken} \mapsto \var{q})\} \\
-          0 & \text{otherwise}
-      \end{cases}\\
-    & \text{sum total of the amount of Ada-only outputs} \\
   \end{align*}
   %
   \emph{Main Calculations}
@@ -100,10 +91,6 @@ The changes due to Plutus integration are as follows:
     & \fun{ubalance} ~ utxo = \sum_{\wcard\mapsto\var{q}\in~\var{utxo}}
     \fun{getValue}~\var{q} \\
     & \text{UTxO balance} \\
-    \nextdef
-    & \fun{wbalance} \in \Wdrl \to \Coin \\
-    & \fun{wbalance} ~ ws = \sum_{(\wcard\mapsto c)\in\var{ws}} c \\
-    & \text{withdrawal balance} \\
     \nextdef
     & \fun{consumed} \in \PParams \to \UTxO \to \StakeDelegs \to \Wdrl \to \Tx \to \Value \\
     & \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \\
@@ -126,10 +113,6 @@ The changes due to Plutus integration are as follows:
 
 In the following Figure \ref{fig:functions:script1} we give the functions
 related to sequential script validation.
-
-\begin{itemize}
-\item jhk
-\end{itemize}
 
 \begin{figure}[htb]
   \begin{align*}
@@ -169,16 +152,10 @@ the certificate witness, or the payment credential part of a UTxO address
 full validator is looked up (by hash value) in the finite map $\fun{txvlds}$ in the
 body of the transaction, and must hash to the value by which it is indexed
 
-\item the data script, which is included in the script input
+\item the data values and redeemers, which are also looked up by hash in $\fun{txdats}~{tx}$
 
-* this data script must hash to the value stored in the UTxO entry correposing to
-this transaction input
-
-\item the redeemer script, provided in full as part of a script-spending
-transaction input
-
-\item the $\Value$ of the UTxO entry being spent, or the coin value associated
-with reward address
+\item the validation data, built using the UTxO, the transaction itself,
+and the current item being validated
 \end{itemize}
 
 Recall that $\fun{validationData}$ constructs the validation data (kept abstract
@@ -223,7 +200,7 @@ fees required.
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
     & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}, (\var{dataval},\var{rdmr}, \\
     & ~~ \fun{validationData}~\var{utxo}~\var{tx}~
-      (txid,ix,(\var{dataval},\var{rdmr})))) ~\vert \\
+      (txid,ix,(\var{hash_d},\var{hash_r})))) ~\vert \\
     & ~~(txid,ix,(\var{hash_d},\var{hash_r})) \in
     \fun{txinputs_s}~\var{tx}, \\
     & ~~\wcard \mapsto \var{dataval} \in \var{hash_d}\restrictdom \fun{txdats}~{tx} \\
@@ -244,7 +221,10 @@ fees required.
 
 Figure \ref{fig:ts-types:utxo-scripts} gives the transition system for the second phase of
 the two-phase script validation. The second phase requires actually running
-the scripts to see if they validate.
+the scripts to see if they validate. This system is similar to
+the UTXO transition system, but signal here is a list of pairs of a validator
+script and the corresponding input data. In addition, we keep track of the
+fee remaining that can be used to conver the cost of script execution, $\var{remFee}$.
 
 \begin{figure}[htb]
   \emph{Validation environment}
@@ -288,29 +268,24 @@ the scripts to see if they validate.
 \end{figure}
 
 The rules for the second-phase script validation are given in
-Figure~\ref{fig:rules:utxo-scrval}. There are two transition rules.
-The first rule, $\mathsf{Scripts\mbox{-}Val}$,
-is for the application of a transaction containing only
-validating scripts. It applies when:
+Figure~\ref{fig:rules:utxo-scrval}. There are three transition rules.
+The first rule, $\mathsf{Scripts\mbox{-}Val}$, applies when
 
 \begin{itemize}
-  \item The validity tag of the transaction is $\Yes$
-  (correponding predicate failure is \emph{BagValidationTag})
-  \item All scripts (Plutus and multisig) in that transaction validate
-  (correponding predicate failure is \emph{ScriptsDontValidate})
-  \item The update proposals in this transaction result in a valid state change
+\item there
+are no scripts to validate in the signal list (i.e. this is the base case of
+induction when all the scripts have validated)
+\item the validation tag is applied correctly (it is $\Yes$)
 \end{itemize}
 
 When this rule applies, the states of the UTxO, fee
   and deposit pots, and updates are updated exactly as in the current
   ledger spec.
 
-The $\mathsf{Scripts\mbox{-}NotVal}$ rule applies when
+The $\mathsf{Scripts\mbox{-}Stop}$ rule applies when
 
 \begin{itemize}
-  \item validation fails
-  for one of the scripts in the transaction (only one script validation may fail,
-  since validation does not proceed after this). In this case,
+  \item The currenct script-input pair being validated does not validate
   \item The validation tag is $\Nope$
 \end{itemize}
 
@@ -324,6 +299,26 @@ Its application results in the following state changes:
   \item The sum total of the value of the marked UTxO entries
   is added to the fee pot
 \end{itemize}
+
+The $\mathsf{Scripts\mbox{-}Ind}$ rule applies when
+
+\begin{itemize}
+  \item the current script being validated has validated
+  \item there is a non-negative fee which remains to pay for validating
+  the rest of the scripts in the list
+  \item the validation tag is $\Yes$
+  \item transition rules apply for rest of the list
+\end{itemize}
+
+The only state change in this rule is of the variable $\var{remFee}$.
+It is decreased by subtracting the cost of the execution of the
+current script from its current value.
+This is the variable we use to keep track of the remaining funds for
+script execution. If the transaction is overpaying ($\fun{txscrfee}~{tx}$
+is too big), the whole fee is still taken.
+
+All the $\UTxOState$ changes happen when one of the non-recursive rules
+applies.
 
 It is always in the interest of the slot leader to have the new block validate,
 with as many valid transactions as possible. This general heuristic,
@@ -417,7 +412,7 @@ will result in the funds being locked forever in the associated rewards account.
     \inference[Scripts-Stop]
     {
     (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket_
-    {\fun{costm}~\var{pp},\var{remFee}} (\fun{snd}~{s})
+    {\fun{costm}~\var{pp},\fun{prices}~\var{pp},\var{remFee}} (\fun{snd}~{s})
     \\
     ~
     \\
@@ -458,7 +453,8 @@ will result in the funds being locked forever in the associated rewards account.
   \begin{equation}
     \inference[Scripts-Ind]
     {
-    (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket {\fun{costm}~\var{pp},\var{remFee}} (\fun{snd}~{s})
+    (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket
+    _{\fun{costm}~\var{pp},\fun{prices}~\var{pp},\var{remFee}} (\fun{snd}~{s})
     \\
     ~
     \\
@@ -537,40 +533,65 @@ will result in the funds being locked forever in the associated rewards account.
 \end{figure}
 
 In Figure \ref{fig:rules:utxo-shelley}, we present the $\type{UTxO-inductive}$
-transition rule. It compares to the original rule in the Shelley ledger spec
-as follows. The preconditions remain the same, with the following additions:
+transition rule. It has the following preconditions (the relevant ones remain
+from the original Shelley spec):
 
 \begin{itemize}
+  \item the transaction is being processed within its validity interval
+
+  \item the hash of the protocol parameters in the transaction matches
+  the hash of their current values on the ledger
+
+  \item the transaction has at least one input
+
+  \item all inputs in a transaction correspond to UTxO entries
+
+  \item the general accounting property holds
+
+  \item the script fees a transaction pays are less than the max allowed
+
   \item the $\fun{txfee}~\var{tx} \leq ...$ check
-  that the value of the outputs corresponding to the inputs selected
-  for paying script fees indeed covers the total fee amount (and does not
-  include non-Ada tokens),
+  that the value of the outputs corresponding to the fee-marked inputs
+  indeed covers the total fee amount - the transaction fee plus the
+  script execution fees (and these inputs contain only
+  Ada tokens)
 
-  \item the check that the transaction contains all the required validator
-  scripts, and that the data scripts carried by the transaction inputs hash to the
-  data hashes stored in the corresponding UTxO entry
+  \item the transaction fee is at least the minimum fee it is obligated to pay
 
-  \item the check that the hash-indexed validator scripts in the transaction
-  indeed correspond to their hash indexes
+  \item for each script input, the transaction is carrying the full
+  validator script, and the full data value and redeemer (looked up by hash
+  values in the metadata)
 
-  \item the check that the hash-indexed data scripts in the
-  transaction indeed correspond to their hash indexes,
+  \item for each reward withdrawal from a script address, the transaction
+  has the full validator in the metadata
 
-  \item the UTXOS state transition.
+  \item for each script-credential certificate, the transaction
+  has the full validator in the metadata
+
+  \item the hash indexes of all validators are their correct hashes
+
+  \item the hash indexes of all $\Data$ values are their correct hashes
+
+  \item all outputs of the transaction contain positive quantities
+
+  \item the transaction size does not exceed maximum
+
+  \item the UTXOS state transition is valid, with the signal being
+  the full list of all scripts that need validating in the transaction, paired with
+  their corresponding input data
 \end{itemize}
-
-Note that the types and rules for the UP transition (which is one of the
-pre-conditions in the are $\type{UTxO-inductive}$ rule) are not included
-in this document as there is no change there due to Plutus integration.
-All of the state changes of the UTXO transition rules are prescribed by
-the UTXOS transition in the precondition.
 
 
 \begin{figure}[htb]
   \begin{equation}\label{eq:utxo-inductive-shelley}
     \inference[UTxO-inductive]
-    { \txttl tx \geq \var{slot}
-      & \txins{tx} \neq \emptyset
+    { \fun{txlst}~tx \leq \var{slot}
+      & \fun{txttl}~tx \geq \var{slot}
+      & \fun{hashPP}~{tx} = \fun{hash}~{pp}
+      \\
+      ~
+      \\
+      \txins{tx} \neq \emptyset
       & \txins{tx} \subseteq \dom \var{utxo}
       \\
       \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{pp}{stpools}~{tx}
@@ -581,8 +602,9 @@ the UTXOS transition in the precondition.
       \\
       ~
       \\
-      \txfee{tx} + \fun{txscrfee}~{tx} \leq
-      \fun{ubalance}~(\fun{adaOnly}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})) \\
+      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) = \\
+      \{\mathsf{adaID} \mapsto
+      (\mathsf{adaToken} \mapsto \var{q})~ \vert~ q \geq \txfee{tx} + \fun{txscrfee}~{tx} \} \\
       \minfee{pp}{tx} \leq \txfee{tx}
       \\
       ~
@@ -706,17 +728,29 @@ the UTXO rule. The changes we have made to the functions in Figure
 \ref{fig:rules:utxow-shelley}, are only removing any
 functions, predicates, and let-bindings having to do with scripts.
 
-Note here that witnessing (at least for spending PK outputs) must necessarily
+Note here that witnessing (at least for spending PK outputs) should ideally
 be done before the second phase of script validation (i.e. scipt execution).
-This is because script validation takes resources, the use of which must
-be covered by fees regardless of whether the validation succeeds.
-Note that if a block is deemed invalid for a reason other than
-script validation failure, as usual the block will be discarded and
-these fees will not be paid. Witnessing
-guarantees that all PK outputs spending is authorized, and it is fine to
-consume the PK outputs as fee payment. In the UTXOW transition rule,
-this is the case. Witnessing predicates are first, followed by the UTXO transition
-predicate.
+This is because script validation takes resources, and we want to ensure
+that we only run the scripts if we expect that other things in the transaction are
+valid and we do not have to throw it away after running the scripts (which means
+the execution costs will not be covered).
+
+Note here that the signatures done by the owners of the keys paying the fees
+take on another purpose in light of this two-phase validation.
+They now ensure that the parties paying the fees have signed off on all
+inputs to script validation, which include
+
+\begin{itemize}
+  \item the hashes of the data values and redeemers
+  \item the fees the transaction is paying for script execution
+  \item the current cost model and prices for resource use (used to calculate
+  the required fees)
+\end{itemize}
+
+This way, the parties whose money is at risk in case of script validation
+failure are assured of a deterministic outcome to this validation, since
+all inputs to script validation are signed and thus not tampered with.
+
 
 \begin{figure}[htb]
   \begin{align*}

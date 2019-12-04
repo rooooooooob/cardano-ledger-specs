@@ -36,8 +36,8 @@ except for the following changes:
   both fungible and non fungible tokens
 
   \item $\Info$: is the additional information an input in a transaction must
-  have when spending a script output. This includes the redeemer,
-  data.
+  have when spending a script output. This is the hashes of the redeemer and
+  data values.
 
   \item $\TxInScr$: A transaction input spending a script output.
 
@@ -163,7 +163,9 @@ except for the following changes:
 The types for passing to Plutus scripts are added in Figure \ref{fig:defs:utxo-pending}.
 There is current item $\CurItem$, which represents either the current input being
 spent, the current certificated being validated, or the current reward
-withdrawal. $\ScrInData$ is all the input data for a script (either MSIG or PLC).
+withdrawal. $\ScrInData$ is all the input data for a script. It is
+just validation data for MSIG, and data value, redeemer and validation data for PLC.
+
 
 \begin{figure*}[htb]
   \emph{Validation Data Types}
@@ -193,10 +195,11 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   where the first slot is accessed by $\fun{txlst}$.
   \item $\TxBody$ now includes $\Value$, which represents
   the tokens forged and taken out of circulation by the transaction
+  \item $\TxBody$ also has the hash of the current protocol parameters, $\HashPP$
   \item Not as part of the body, the transaction now also includes
   a finite map lookup $\Vlds$ to avoid having multiple
   copies of the validator (one for each input spending from that script).
-  \item $\HashDat \mapsto \Data$ is a similar lookup for data scripts.
+  \item $\HashDat \mapsto \Data$ is a similar lookup for $\Data$.
   The full data script is now optional to include in a transaction when
   paying to a script. It is never
   stored on-chain and is only provided for the spender of the output
@@ -211,10 +214,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
   are included. Scripts are handled separately.
   \item $\fun{txinputs}$ type changed to map to $\TxInTx$
-  \item $~\fun{txlst},~\fun{getValue},~\fun{getAddr}, ~\fun{getDataHash},
-  ~\fun{txlst},~\fun{txvlds},~\fun{txdats},
-  ~\fun{forged}$
-  accessor functions added
+  \item Accessor functions added
 \end{itemize}
 
 
@@ -227,7 +227,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
       \times \Coin \times \Coin \times \Value \\
-    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update
+    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP
   \end{align*}
   %
   \begin{equation*}
@@ -251,6 +251,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
       \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
       \fun{txscrfee} & \Tx \to \Coin & \text{portion of fee allocated for scripts}\\
+      \fun{hashPP} & \Tx \to \HashPP & \text{hash of the protocol params}\\
       \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
       \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
@@ -311,16 +312,16 @@ are presented.
 \begin{itemize}
   \item $\fun{valMSIGupTo}$ performs validation for multi-sig scripts
   (this does not require data or redeemer scripts).
-  \item $\fun{valPLCupTo}$ performs validation for plutus scripts.
-  \begin{note}
-    these need to be defined still
-  \end{note}
+  \item $\fun{valPLCupTo}$ performs validation for Plutus scripts.
 \end{itemize}
 
 These functions take their corresponding parameters (no data or redeemer
 scripts in the case of multisig). They also
 takes a term of type $\Coin$ as a parameter and perform validation
-\textit{limited by resources indicated by} this value. They return a pair
+\textit{limited by resources indicated by} this value.
+In order to perform the calculation which converts resource use into an
+Ada price, the $\CostMod$ and $\Prices$ are also passed as parameters.
+The evaluation functions return a pair
 of the boolean validation result and the remaining funds available to pay
 for validation of the rest of the scripts in the transaction (if any).
 
@@ -334,9 +335,11 @@ for validation of the rest of the scripts in the transaction (if any).
   \emph{Script Validation Functions}
   %
   \begin{align*}
-    & \fun{valMSIGupTo} \in \CostMod \to\ScriptMSig\to \Data \to \Coin \to (\IsValidating \times \Coin) \\
+    & \fun{valMSIGupTo} \in \CostMod \to \Prices \to\ScriptMSig\to \Data \to
+    \Coin \to (\IsValidating \times \Coin) \\
     & \text{resource-restricted validation of a multi-sig script} \\~\\
-    & \fun{valPLCupTo} \in \CostMod \to\ScriptPlutus\to (\Data \times \Data \times \Data \times
+    & \fun{valPLCupTo} \in \CostMod \to \Prices\to\ScriptPlutus\to
+    (\Data \times \Data \times \Data \times
     \Coin) \to (\IsValidating \times \Coin) \\
     & \text{resource-restricted validation of a Plutus script}
   \end{align*}
@@ -344,15 +347,15 @@ for validation of the rest of the scripts in the transaction (if any).
   \emph{Notation}
   %
   \begin{align*}
-    \llbracket \var{script_v} \rrbracket_{\var{c},~\var{cm}}(\var{dataval},~\var{rdmr},~\var{ptx})
-    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~(\var{dataval},~\var{rdmr},~\var{ptx},~
+    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{pr},\var{c}}(\var{dataval},~\var{rdmr},~\var{ptx})
+    &=& \fun{valPLCupTo} ~{cm}~{pr}~\var{script_v}~(\var{dataval},~\var{rdmr},~\var{ptx},~
     \var{c})
     \nextdef
-    \llbracket \var{script_v} \rrbracket_{\var{c},~\var{cm}} \var{ptx}
+    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{pr},\var{c}} \var{ptx}
     &=& \begin{cases}
-    \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
+    \fun{valPLCupTo} ~\var{cm}~{pr}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
     \var{c} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
-    \fun{valMSIGupTo} ~\var{cm}~\var{script_v} ~\var{ptx}~
+    \fun{valMSIGupTo} ~\var{cm}~{pr}~\var{script_v} ~\var{ptx}~
     \var{c} & \text{if}~\var{script_v} \in \ScriptMSig
       \end{cases}\\
   \end{align*}
