@@ -77,6 +77,9 @@ block (stored as a protocol parameter).
       \\~\\
       \sum_{tx\in txs} \fun{txscrfee}~{tx} \leq \fun{maxBlockScrFee}~\var{pp}
       \\~\\
+      \var{h_{pp}} := \fun{hash}~\var{pp} &
+      \forall~tx\in txs,~\fun{hashPP}~{tx} = \var{h_{pp}}
+      \\~\\
       {
         {\begin{array}{c}
                  \bslot{bhb} \\

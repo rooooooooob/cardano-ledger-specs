@@ -35,11 +35,8 @@ except for the following changes:
   \item $\Value$ is the multicurrency type used to represent
   both fungible and non fungible tokens
 
-  \item $\Info$: is the additional information an input in a transaction must
-  have when spending a script output. This is the hashes of the redeemer and
-  data values.
-
-  \item $\TxInScr$: A transaction input spending a script output.
+  \item $\TxInScr$: A transaction input spending a script output. It must
+  include the hash of the redeemer.
 
   \item $\TxInTx$: A transaction input (now distinct from the input $\TxIn$ in
   a UTxO entry). Can be a PK-address spending input
@@ -110,14 +107,9 @@ except for the following changes:
       & \TxId \times \Ix
 %      & \text{UTxO entry reference}
       \\
-      \var{(\var{dvhash},\var{rdhash})}
-      & \Info
-      & \HashDat \times \HashDat
-%      & \text{validation data}
-      \\
-      (\var{txid}, \var{ix}, \var{inf})
+      (\var{txid}, \var{ix}, \var{hash_r})
       & \type{TxInScr}
-      & \TxIn \times \Info
+      & \TxIn \times \HashDat
 %      & \text{script input}
       \\
       \var{txin}
@@ -248,6 +240,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
       \fun{getValue} & \TxOut \to \Value & \text{output value} \\
       \fun{getAddr} & \TxOut \to \Addr & \text{output address} \\
+      \fun{inref} & \TxInTx \to \TxIn & \text{input reference $(txid,ix)$} \\
       \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
       \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
       \fun{txscrfee} & \Tx \to \Coin & \text{portion of fee allocated for scripts}\\

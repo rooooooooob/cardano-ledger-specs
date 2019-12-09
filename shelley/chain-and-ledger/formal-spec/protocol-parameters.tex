@@ -8,7 +8,7 @@ For Plutus integration, we have added the following abstract types
 (see Figure~\ref{fig:defs:protocol-parameters}):
 
 \begin{itemize}
-\item $\PlutusVer$: This is the current version of the Plutus interpreter
+\item $\PlutusVer$: This represents the version number of the Plutus interpreter
 \item $\CostMod$: These are coefficients used to convert \\
 \texttt{resource primitives}~$\to \ExUnits$
 \item $\Prices$: These are coefficients used to get the final price of script
@@ -34,7 +34,7 @@ We also added several protocol parameters and accessor functions.
   %
   \begin{equation*}
       \begin{array}{r@{~\in~}lr}
-        \var{plutusVer} \mapsto \PlutusVer & \PParams & \text{current Plutus interpreter version}\\
+        \var{maxPlutusVer} \mapsto \PlutusVer & \PParams & \text{most recent supported Plutus interpreter version}\\
         \var{costm} \mapsto \CostMod & \PParams & \text{script exec cost model}\\
         \var{prices} \mapsto \Prices & \PParams & \text{coefficients for ExUnits prices} \\
         \var{maxTxScrFee} \mapsto \Coin & \PParams & \text{max total transaction script execution fee}\\
@@ -45,7 +45,7 @@ We also added several protocol parameters and accessor functions.
   \emph{Accessor Functions}
   %
   \begin{center}
-  \fun{costm},~\fun{maxTxScrFee},~\fun{maxBlockScrFee},~\fun{prices},~\fun{plutusVer}
+  \fun{costm},~\fun{maxTxScrFee},~\fun{maxBlockScrFee},~\fun{prices},~\fun{maxPlutusVer}
   \end{center}
   %
   \caption{Definitions Used in Protocol Parameters}

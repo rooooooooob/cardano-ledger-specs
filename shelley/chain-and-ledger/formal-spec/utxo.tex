@@ -12,7 +12,6 @@ given in Figure \ref{fig:functions:insouts}. These include
 \begin{itemize}
   \item The function $\fun{txinputs_{vf}}$ returns only the inputs selected to be used
 for paying transaction fees
-  \item The function $\fun{txinputs_s}$ returns only script transaction inputs
   \item The function $\fun{txins}$ that returns $\TxIn$ part of both script
   and non-script transaction inputs.
   \item The function $\fun{outs}$ is unchanged
@@ -26,10 +25,6 @@ for paying transaction fees
     &~~\{ (txid,ix)~\vert~((txid,ix),\var{isfee}) \in
     \fun{txinputs} ~tx\cap \TxIn,~
      \var{isfee}\in\Yes\}
-    \nextdef
-    & \fun{txinputs_s} \in \Tx \to \powerset{\TxInScr}
-    & \text{tx script inputs} \\
-    & \fun{txinputs_s} ~tx ~=~ \fun{txinputs} ~tx\cap \TxInScr
     \nextdef
     & \fun{outs} \in \Tx \to \UTxO
     & \text{tx outputs as UTxO} \\
@@ -200,17 +195,16 @@ fees required.
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
     & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}, (\var{dataval},\var{rdmr}, \\
     & ~~ \fun{validationData}~\var{utxo}~\var{tx}~
-      (txid,ix,(\var{hash_d},\var{hash_r})))) ~\vert \\
-    & ~~(txid,ix,(\var{hash_d},\var{hash_r})) \in
-    \fun{txinputs_s}~\var{tx}, \\
-    & ~~\wcard \mapsto \var{dataval} \in \var{hash_d}\restrictdom \fun{txdats}~{tx} \\
-    & ~~\wcard \mapsto \var{rdmr} \in \var{hash_r}\restrictdom \fun{txdats}~{tx} \\
+      (txid,ix,\var{hash_r}))) ~\vert \\
+    & ~~(txid,ix,\var{hash_r}) \in \fun{txinputs}~\var{tx}, \\
+    & ~~\wcard \mapsto \var{rdmr} \in \var{hash_r}\restrictdom \fun{txdats}~{tx}, \\
     & ~~\wcard \mapsto ((a,v),h_d) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
+    & ~~\wcard \mapsto \var{dataval} \in \var{h_d}\restrictdom \fun{txdats}~{tx}, \\
     & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~{a}\restrictdom\fun{txvlds}~{tx} \}\\
     & ~~\cup~ \\
     & ~~\{ (\var{script_v},\fun{validationData}~\var{utxo}~\var{tx}~
       (txid,ix)) ~\vert \\
-    & ~~(txid,ix) \in \fun{txinputs_s}~\var{tx}, \\
+    & ~~(txid,ix) \in \fun{txinputs}~\var{tx}, \\
     & ~~ \wcard \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
     & ~~\wcard\mapsto \var{script_v}\in
      \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}
@@ -558,9 +552,17 @@ from the original Shelley spec):
 
   \item the transaction fee is at least the minimum fee it is obligated to pay
 
-  \item for each script input, the transaction is carrying the full
-  validator script, and the full data value and redeemer (looked up by hash
-  values in the metadata)
+  \item If an input in the transaction is spending a script UTxO entry,
+  the $\fun{txvlds}$ map contains the corresponding full validator, and
+  if this validator is a Plutus script, the input must be a script input
+  (i.e. contain a redeemer)
+
+  \item If a transaction input is a Plutus script-type input (has a redeemer), the
+  $\fun{txdats}$ map has full redeemer as well as the full data-value
+  the hash of which is contained in the corresponding UTxO entry
+
+  \item A transaction output paying to a Plutus script must be of type
+  $\TxOutScr$, i.e. contain the hash of the data-value
 
   \item for each reward withdrawal from a script address, the transaction
   has the full validator in the metadata
@@ -587,7 +589,6 @@ from the original Shelley spec):
     \inference[UTxO-inductive]
     { \fun{txlst}~tx \leq \var{slot}
       & \fun{txttl}~tx \geq \var{slot}
-      & \fun{hashPP}~{tx} = \fun{hash}~{pp}
       \\
       ~
       \\
@@ -609,11 +610,26 @@ from the original Shelley spec):
       \\
       ~
       \\
-      \forall~\var{(\var{txin},(\var{hash_d},\var{hash_r}))}\in\fun{txinputs_s}~{tx}, \\
-      (\var{hash_d},\var{hash_r} \in \fun{dom}(\fun{txdats}~{tx})) ~\wedge \\
-      (\forall \wcard \mapsto \var{txout} \in \var{txin}\restrictdom\var{utxo}, \\
-      \fun{validatorHash}~(\fun{getAddr}~\var{txout}) \in \fun{dom}~\fun{txvlds}~{tx} \\
-      \wedge ~\fun{hashData}~{dataval}~=~ \fun{getDataHash}~\var{txout})
+      \forall~\var{txin}\in\fun{txinputs}~{tx},
+      \forall \wcard \mapsto \var{txout} \in \fun{inref}~{txin}\restrictdom\var{utxo}, \\
+      \fun{getAddr}~\var{txout} \in \AddrScr \Rightarrow
+      (\fun{validatorHash}~(\fun{getAddr}~\var{txout})\in \fun{dom}~(\fun{txvlds}~{tx})) \\
+      \wedge ~(\forall \wcard\mapsto \var{vld} \in 
+      \fun{validatorHash}~(\fun{getAddr}~\var{txout}) \restrictdom \fun{txvlds}~{tx},
+      \var{vld}\in \ScriptPlutus \Rightarrow ~\var{txin}\in\TxInScr)
+      \\
+      ~
+      \\
+      \forall~\var{(\var{txin},\var{hash_r})}\in\fun{txinputs}~{tx},
+      (\var{hash_r} \in \fun{dom}(\fun{txdats}~{tx})) \\
+      \wedge~(\forall \wcard \mapsto \var{(a,c,h_d)} \in \var{txin}\restrictdom\var{utxo},
+      \var{h_d} \in \fun{dom}(\fun{txdats}~{tx}))
+      \\
+      ~
+      \\
+      \forall~\var{txout}\in\fun{txouts}~{tx},
+      \forall \wcard\mapsto\var{vld}\in \\ \fun{validatorHash}~(\fun{getAddr}~{txout})\restrictdom\fun{txvlds}~{tx}, \\
+      \var{vld} \in \ScriptPlutus \Rightarrow \var{txout}\in\TxOutScr
       \\
       ~
       \\
