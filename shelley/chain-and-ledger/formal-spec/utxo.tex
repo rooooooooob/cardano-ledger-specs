@@ -47,6 +47,9 @@ Figure~\ref{fig:functions:utxo} defines functions needed for the UTxO transition
 The changes due to Plutus integration are as follows:
 
 \begin{itemize}
+  \item $\fun{txscrfee}$ returns the fee a transaction must pay for script
+  execution based on current resource use pricing
+
   \item $\fun{adaAll}$ adds up all the Ada in a UTxO
 
   \item
@@ -70,6 +73,12 @@ The changes due to Plutus integration are as follows:
 The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Coin$.
 
 \begin{figure}[htb]
+  %
+  \emph{Abstract Functions}
+  \begin{align*}
+    & \fun{txscrfee} \in \Prices \to \ExUnits \to \Coin \\
+    & \text{calculates the script fee a transaction must pay} \\
+  \end{align*}
   %
   \emph{Helper Functions}
   \begin{align*}
@@ -96,8 +105,9 @@ The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Coin$.
     \nextdef
     & \fun{produced} \in \PParams \to \StakePools \to \Tx \to \Value \\
     & \fun{produced}~\var{pp}~\var{stpools}~\var{tx} = \\
-    &~~\ubalance{(\outs{tx})}
-    + \fun{adaVal}~(\txfee{tx} + \fun{txscrfee}~{tx} + \deposits{pp}{stpools}~{(\txcerts{tx})})\\
+    &~~\ubalance{(\outs{tx})}  + \fun{adaVal}~(\txfee{tx} \\
+    &~~ + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) + \\
+    &~~ \deposits{pp}{stpools}~{(\txcerts{tx})})\\
     & \text{value produced} \\
   \end{align*}
   \caption{Functions used in UTxO rules}
@@ -218,7 +228,7 @@ the two-phase script validation. The second phase requires actually running
 the scripts to see if they validate. This system is similar to
 the UTXO transition system, but signal here is a list of pairs of a validator
 script and the corresponding input data. In addition, we keep track of the
-fee remaining that can be used to conver the cost of script execution, $\var{remFee}$.
+execution units remaining that can be used to during script execution, $\var{remExU}$.
 
 \begin{figure}[htb]
   \emph{Validation environment}
@@ -245,7 +255,7 @@ fee remaining that can be used to conver the cost of script execution, $\var{rem
         \var{deposits} & \Coin & \text{deposits pot}\\
         \var{fees} & \Coin & \text{fee pot}\\
         \var{ups} & \UpdateState & \text{update state}\\
-        \var{remFee} & \Coin & \text{fee remaining to spend on validation} \\
+        \var{remExU} & \ExUnits & \text{exunits remaining to spend on validation} \\
       \end{array}
     \right)
   \end{equation*}
@@ -280,6 +290,7 @@ The $\mathsf{Scripts\mbox{-}Stop}$ rule applies when
 
 \begin{itemize}
   \item The currenct script-input pair being validated does not validate
+  (because there are not enough $\ExUnits$ left or other reasons)
   \item The validation tag is $\Nope$
 \end{itemize}
 
@@ -304,7 +315,7 @@ The $\mathsf{Scripts\mbox{-}Ind}$ rule applies when
   \item transition rules apply for rest of the list
 \end{itemize}
 
-The only state change in this rule is of the variable $\var{remFee}$.
+The only state change in this rule is of the variable $\var{remExU}$.
 It is decreased by subtracting the cost of the execution of the
 current script from its current value.
 This is the variable we use to keep track of the remaining funds for
@@ -349,7 +360,7 @@ will result in the funds being locked forever in the associated rewards account.
     \inference[Scripts-Val]
     {
     \fun{txvaltag}~\var{tx} \in \Yes  &
-    \var{remFee}~\geq~0
+    \var{remExU}~\geq~0
     \\
     ~
     \\
@@ -387,7 +398,7 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remFee}\\
+        \var{remExU}\\
       \end{array}
       \right)
       \trans{utxos}{\epsilon}
@@ -397,7 +408,7 @@ will result in the funds being locked forever in the associated rewards account.
         \varUpdate{\var{deposits} + \var{depositChange}} \\
         \varUpdate{\var{fees} + \txfee{tx} + \var{decayed}} \\
         \varUpdate{\var{ups'}} \\
-        \var{remFee}\\
+        \var{remExU}\\
       \end{array}
       \right) \\
     }
@@ -405,13 +416,13 @@ will result in the funds being locked forever in the associated rewards account.
   \begin{equation}
     \inference[Scripts-Stop]
     {
-    (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket_
-    {\fun{costm}~\var{pp},\fun{prices}~\var{pp},\var{remFee}} (\fun{snd}~{s})
+    (\var{isVal},\var{remExU'})~:=~ \llbracket \fun{fst}~{s} \rrbracket_
+    {\fun{costm}~\var{pp},\var{remExU}} (\fun{snd}~{s})
     \\
     ~
     \\
     \fun{txvaltag}~\var{tx} \in \Nope &
-    (\var{remFee'}~<~0 ~ \lor ~ \var{isVal}\in \Nope)
+    (\var{remExU'}~<~0 ~ \lor ~ \var{isVal}\in \Nope)
     }
     {
     \begin{array}{l}
@@ -429,7 +440,7 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remFee}\\
+        \var{remExU}\\
       \end{array}
       \right)
       \trans{utxos}{s;\Gamma}
@@ -439,7 +450,7 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{tx}\restrictdom \var{utxo})} \\
         \var{ups} \\
-        \var{remFee}\\
+        \var{remExU}\\
       \end{array}
       \right)
     }
@@ -447,12 +458,12 @@ will result in the funds being locked forever in the associated rewards account.
   \begin{equation}
     \inference[Scripts-Ind]
     {
-    (\var{isVal},\var{remFee'})~:=~ \llbracket \fun{fst}~{s} \rrbracket
-    _{\fun{costm}~\var{pp},\fun{prices}~\var{pp},\var{remFee}} (\fun{snd}~{s})
+    (\var{isVal},\var{remExU''})~:=~ \llbracket \fun{fst}~{s} \rrbracket
+    _{\fun{costm}~\var{pp},\var{remExU'}} (\fun{snd}~{s})
     \\
     ~
     \\
-    (\var{remFee'}~\geq~0 ~ \wedge ~ \var{isVal}\in \Yes)
+    (\var{remExU''}~\geq~0 ~ \wedge ~ \var{isVal}\in \Yes)
     \\
     ~
     \\
@@ -474,7 +485,7 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remFee'}\\
+        \var{remExU}\\
       \end{array}
       }
       \right)
@@ -486,7 +497,7 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remFee''}\\
+        \var{remExU'}\\
       \end{array}
       }
       \right)
@@ -507,17 +518,17 @@ will result in the funds being locked forever in the associated rewards account.
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remFee}\\
+        \var{remExU}\\
       \end{array}
       \right)
-      \trans{utxos}{s;\Gamma}
+      \trans{utxos}{\Gamma;s}
       \left(
       \begin{array}{r}
         \var{utxo} \\
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \varUpdate{remFee'}\\
+        \varUpdate{remExU''}\\
       \end{array}
       \right)
     }
@@ -599,13 +610,14 @@ from the original Shelley spec):
       \\
       ~
       \\
-      \fun{txscrfee}~{tx} \leq \fun{maxTxScrFee}~{pp}
+      \fun{txexunits}~{tx} \leq \fun{maxTxExUnits}~{pp}
       \\
       ~
       \\
       \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) = \\
       \{\mathsf{adaID} \mapsto
-      (\mathsf{adaToken} \mapsto \var{q})~ \vert~ q \geq \txfee{tx} + \fun{txscrfee}~{tx} \} \\
+      (\mathsf{adaToken} \mapsto \var{q})~ \vert~ q \geq \txfee{tx}
+      + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) \} \\
       \minfee{pp}{tx} \leq \txfee{tx}
       \\
       ~
@@ -614,7 +626,7 @@ from the original Shelley spec):
       \forall \wcard \mapsto \var{txout} \in \fun{inref}~{txin}\restrictdom\var{utxo}, \\
       \fun{getAddr}~\var{txout} \in \AddrScr \Rightarrow
       (\fun{validatorHash}~(\fun{getAddr}~\var{txout})\in \fun{dom}~(\fun{txvlds}~{tx})) \\
-      \wedge ~(\forall \wcard\mapsto \var{vld} \in 
+      \wedge ~(\forall \wcard\mapsto \var{vld} \in
       \fun{validatorHash}~(\fun{getAddr}~\var{txout}) \restrictdom \fun{txvlds}~{tx},
       \var{vld}\in \ScriptPlutus \Rightarrow ~\var{txin}\in\TxInScr)
       \\
@@ -681,7 +693,7 @@ from the original Shelley spec):
             \var{deposits} \\
             \var{fees} \\
             \var{ups}\\
-            \var{\fun{txscrfee}~{tx}}\\
+            \var{\fun{txexunits}~{tx}}\\
           \end{array}
         \right)
       }
@@ -693,7 +705,7 @@ from the original Shelley spec):
             \var{deposits'} \\
             \var{fees'} \\
             \var{ups'}\\
-            \var{remFee}\\
+            \var{remExU}\\
           \end{array}
         \right)
       }
@@ -759,8 +771,8 @@ inputs to script validation, which include
 \begin{itemize}
   \item the hashes of the data values and redeemers
   \item the fees the transaction is paying for script execution
-  \item the current cost model and prices for resource use (used to calculate
-  the required fees)
+  \item the current cost model for resource use (used to calculate
+  the required $\ExUnits$) and other relevant protocol parameters (hashed)
 \end{itemize}
 
 This way, the parties whose money is at risk in case of script validation

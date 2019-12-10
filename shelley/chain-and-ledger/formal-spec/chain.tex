@@ -75,10 +75,12 @@ block (stored as a protocol parameter).
       &
       \fun{hash}~{txs} = \bbodyhash{bhb}
       \\~\\
-      \sum_{tx\in txs} \fun{txscrfee}~{tx} \leq \fun{maxBlockScrFee}~\var{pp}
+      \sum_{tx\in txs} \fun{txexunits}~{tx} \leq \fun{maxBlockExUnits}~\var{pp}
       \\~\\
-      \var{h_{pp}} := \fun{hash}~\var{pp} &
-      \forall~tx\in txs,~\fun{hashPP}~{tx} = \var{h_{pp}}
+      ((\var{utxo}, \wcard, \wcard, \wcard), \wcard) := ls \\
+      \var{h_{pp}} := \fun{hash}~(\fun{getPlutusPP}~\var{pp}) \\
+      \forall~tx\in txs,~\fun{mkScrLst}~\var{tx}~\var{utxo}~\neq~\epsilon
+      \Rightarrow ~\fun{hashPP}~{tx} = \var{h_{pp}}
       \\~\\
       {
         {\begin{array}{c}

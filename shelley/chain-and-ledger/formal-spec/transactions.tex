@@ -187,7 +187,11 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   where the first slot is accessed by $\fun{txlst}$.
   \item $\TxBody$ now includes $\Value$, which represents
   the tokens forged and taken out of circulation by the transaction
-  \item $\TxBody$ also has the hash of the current protocol parameters, $\HashPP$
+  \item $\TxBody$ now includes $\ExUnits$, which are the total execution units
+  that will be used by all scripts
+  \item $\TxBody$ also has the hash of the current protocol parameters
+  (only the ones relevant to Plutus script validation), $\HashPP^?$,
+  which is only obligatory to include when a transaction is carrying scripts
   \item Not as part of the body, the transaction now also includes
   a finite map lookup $\Vlds$ to avoid having multiple
   copies of the validator (one for each input spending from that script).
@@ -218,8 +222,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Coin \times \Coin \times \Value \\
-    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP
+      \times \Coin \times \ExUnits \times \Value \\
+    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP^?
   \end{align*}
   %
   \begin{equation*}
@@ -243,8 +247,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{inref} & \TxInTx \to \TxIn & \text{input reference $(txid,ix)$} \\
       \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
       \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
-      \fun{txscrfee} & \Tx \to \Coin & \text{portion of fee allocated for scripts}\\
-      \fun{hashPP} & \Tx \to \HashPP & \text{hash of the protocol params}\\
+      \fun{txexunits} & \Tx \to \ExUnits & \text{portion of fee allocated for scripts}\\
+      \fun{hashPP} & \Tx \to \HashPP^? & \text{hash of the protocol params}\\
       \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
       \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
@@ -310,12 +314,12 @@ are presented.
 
 These functions take their corresponding parameters (no data or redeemer
 scripts in the case of multisig). They also
-takes a term of type $\Coin$ as a parameter and perform validation
+takes a term of type $\ExUnits$ as a parameter and perform validation
 \textit{limited by resources indicated by} this value.
-In order to perform the calculation which converts resource use into an
-Ada price, the $\CostMod$ and $\Prices$ are also passed as parameters.
+In order to perform the calculation which converts primitive resource use into an
+abstract units, the $\CostMod$ is also passed as parameters.
 The evaluation functions return a pair
-of the boolean validation result and the remaining funds available to pay
+of the boolean validation result and the remaining $\ExUnits$ available 
 for validation of the rest of the scripts in the transaction (if any).
 
 \begin{note}
@@ -328,28 +332,28 @@ for validation of the rest of the scripts in the transaction (if any).
   \emph{Script Validation Functions}
   %
   \begin{align*}
-    & \fun{valMSIGupTo} \in \CostMod \to \Prices \to\ScriptMSig\to \Data \to
-    \Coin \to (\IsValidating \times \Coin) \\
+    & \fun{valMSIGupTo} \in \CostMod \to\ScriptMSig\to \Data \to
+    \ExUnits \to (\IsValidating \times \ExUnits) \\
     & \text{resource-restricted validation of a multi-sig script} \\~\\
-    & \fun{valPLCupTo} \in \CostMod \to \Prices\to\ScriptPlutus\to
+    & \fun{valPLCupTo} \in \CostMod \to\ScriptPlutus\to
     (\Data \times \Data \times \Data \times
-    \Coin) \to (\IsValidating \times \Coin) \\
+    \ExUnits) \to (\IsValidating \times \ExUnits) \\
     & \text{resource-restricted validation of a Plutus script}
   \end{align*}
   %
   \emph{Notation}
   %
   \begin{align*}
-    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{pr},\var{c}}(\var{dataval},~\var{rdmr},~\var{ptx})
-    &=& \fun{valPLCupTo} ~{cm}~{pr}~\var{script_v}~(\var{dataval},~\var{rdmr},~\var{ptx},~
-    \var{c})
+    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}}(\var{dataval},~\var{rdmr},~\var{ptx})
+    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~(\var{dataval},~\var{rdmr},~\var{ptx},~
+    \var{exunits})
     \nextdef
-    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{pr},\var{c}} \var{ptx}
+    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}} \var{ptx}
     &=& \begin{cases}
-    \fun{valPLCupTo} ~\var{cm}~{pr}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
-    \var{c} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
-    \fun{valMSIGupTo} ~\var{cm}~{pr}~\var{script_v} ~\var{ptx}~
-    \var{c} & \text{if}~\var{script_v} \in \ScriptMSig
+    \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
+    \var{exunits} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
+    \fun{valMSIGupTo} ~\var{cm}~\var{script_v} ~\var{ptx}~
+    \var{exunits} & \text{if}~\var{script_v} \in \ScriptMSig
       \end{cases}\\
   \end{align*}
   \caption{Script Validation, cont.}
