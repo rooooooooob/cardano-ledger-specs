@@ -3,7 +3,9 @@
 -- | This module contains just the type of protocol parameters.
 module PParams
   ( PParams(..)
+  , PlutusPP(..)
   , emptyPParams
+  , emptyPlutusPP
   -- lenses
   , minfeeA
   , minfeeB
@@ -25,6 +27,13 @@ module PParams
   , d
   , extraEntropy
   , protocolVersion
+  , plutusPP
+  , maxPlutusVer
+  , minPlutusVer
+  , maxTxExUnits
+  , maxBlockExUnits
+  , costm
+  , prices
   ) where
 
 import           Cardano.Prelude (NoUnexpectedThunks (..))
@@ -36,6 +45,28 @@ import           Coin (Coin (..))
 import           Slot (EpochNo (..))
 
 import           Lens.Micro.TH (makeLenses)
+
+-- | Plutus version
+type PlutusVer = (Natural, Natural, Natural)
+
+
+-- | Plutus-specific parameter set
+data PlutusPP = PlutusPP
+  { -- | the most recent supported version of the Plutus interpreter
+    _maxPlutusVer    :: PlutusVer
+    -- | the oldest Plutus version scripts that we allow paying to
+  , _minPlutusVer    :: PlutusVer
+    -- | maximum resource units allowed for all scripts in a transaction
+  , _maxTxExUnits    :: ExUnitsAllTypes
+    -- | maximum resource units allowed for all scripts in a block
+  , _maxBlockExUnits :: ExUnitsAllTypes
+    -- | Coefficients for conversion of resource primitives into abstract resource units
+  , _costm            :: CostMod
+    -- | Prices of abstract resource units
+  , _prices           :: Prices
+  } deriving (Show, Eq, Generic)
+
+instance NoUnexpectedThunks PlutusPP
 
 -- | Protocol parameters
 data PParams = PParams
@@ -79,11 +110,26 @@ data PParams = PParams
   , _extraEntropy    :: Nonce
     -- | Protocol version
   , _protocolVersion :: (Natural, Natural, Natural)
+    -- | Plutus-related parameters
+  , _plutusPP        :: PlutusPP
   } deriving (Show, Eq, Generic)
 
 instance NoUnexpectedThunks PParams
 
 makeLenses ''PParams
+makeLenses ''PlutusPP
+
+-- | Returns a basic "empty" `PlutusPP` structure with all zero values.
+emptyPlutusPP :: PlutusPP
+emptyPlutusPP =
+     PlutusPP {
+       _minPlutusVer = (0, 0, 0)
+     , _maxPlutusVer = (0, 0, 0)
+     , _maxTxExUnits = defaultUnits -- no scripts can be run
+     , _maxBlockExUnits = defaultUnits -- no scripts can be run
+     , _costm = defaultModel -- but they're also free
+     , _prices = defaultPrices -- but they're also free
+     }
 
 -- | Returns a basic "empty" `PParams` structure with all zero values.
 emptyPParams :: PParams
@@ -109,4 +155,5 @@ emptyPParams =
      , _d = interval0
      , _extraEntropy = NeutralNonce
      , _protocolVersion = (0, 0, 0)
+     , _plutusPP = emptyPlutusPP
      }

@@ -123,3 +123,12 @@ extractScriptHash =
   mapMaybe (\case
                 ScriptHashObj hk -> Just hk
                 _ -> Nothing)
+
+
+-- | make validation data to pass to Plutus validator
+validationData :: UTxO -> Tx -> CurItem -> Data
+validationData _ _ _ = 1
+
+-- | access only the output reference part of a TxInTx
+-- inputs :: !(Set (TxInTx crypto)) -> !(Set (TxInTx crypto))
+-- inputs _ = "change this"
