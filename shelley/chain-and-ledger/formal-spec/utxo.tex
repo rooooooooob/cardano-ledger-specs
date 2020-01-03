@@ -14,7 +14,8 @@ given in Figure \ref{fig:functions:insouts}. These include
 for paying transaction fees
   \item The function $\fun{txins}$ that returns $\TxIn$ part of both script
   and non-script transaction inputs.
-  \item The function $\fun{outs}$ is unchanged
+  \item The function $\fun{outs}$ adds the slot number of the block in which transaction is
+  included to the outputs now
 \end{itemize}
 
 \begin{figure}[htb]
@@ -26,11 +27,11 @@ for paying transaction fees
     \fun{txinputs} ~tx\cap \TxIn,~
      \var{isfee}\in\Yes\}
     \nextdef
-    & \fun{outs} \in \Tx \to \UTxO
+    & \fun{outs} \in \Slot \to \Tx \to \UTxO
     & \text{tx outputs as UTxO} \\
-    & \fun{outs} ~ \var{tx} =
+    & \fun{outs} ~ \var{slot}~\var{tx} =
         \left\{
-          (\fun{txid} ~ \var{tx}, \var{ix}) \mapsto \var{txout} ~
+          (\fun{txid} ~ \var{tx}, \var{ix}) \mapsto (\var{txout},\var{slot}) ~
           \middle|
           \var{ix} \mapsto \var{txout} \in \txouts{tx}
         \right\} \\
@@ -57,7 +58,7 @@ The changes due to Plutus integration are as follows:
     Token) sum total of all the value in a given UTxO.
 
   \item The $\fun{consumed}$ calculation for the preservation of value remains the
-  same. It is still the sum of the reward address coin consumed, the coin value
+  same. It is still the sum of the reward address value consumed, the value
    UTxO entries consumed, the value forged by a transaction,
    and the value consumed from the deposit pot due
    to the transaction collecting deposit refunds.
@@ -68,46 +69,46 @@ The changes due to Plutus integration are as follows:
   and the deposits it makes
   to the deposit pot (these are the same values as the ledger spec).
   The script execution costs are included in the transaction fee.
+  This calculation now takes the current slot number as an argument.
 \end{itemize}
 
-The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Coin$.
+The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Value$.
 
 \begin{figure}[htb]
   %
   \emph{Abstract Functions}
   \begin{align*}
-    & \fun{txscrfee} \in \Prices \to \ExUnits \to \Coin \\
+    & \fun{txscrfee} \in \Prices \to \ExUnits \to \Value \\
     & \text{calculates the script fee a transaction must pay} \\
   \end{align*}
   %
   \emph{Helper Functions}
   \begin{align*}
-    & \fun{adaAll} \in \UTxO \to \Coin \\
-    & \fun{adaAll}~{\var{utxo}} = \fun{coi}~
-          (\sum  \range ({\mathsf{adaToken}} \restrictdom \range ({\mathsf{adaID}} \restrictdom
-          \fun{ubalance}~\var{utxo}))) \\
+    & \fun{adaAll} \in \UTxO \to \Value \\
+    & \fun{adaAll}~{\var{utxo}} =
+          \mathsf{adaID} \restrictdom   (\fun{ubalance}~\var{utxo}) \\
     & \text{sum total of the amount of Ada in all outputs} \\
   \end{align*}
   %
   \emph{Main Calculations}
   \begin{align*}
     & \fun{ubalance} \in \UTxO \to \Value \\
-    & \fun{ubalance} ~ utxo = \sum_{\wcard\mapsto\var{q}\in~\var{utxo}}
+    & \fun{ubalance} ~ utxo = \sum_{\wcard\mapsto\var{(q,s)}\in~\var{utxo}}
     \fun{getValue}~\var{q} \\
     & \text{UTxO balance} \\
     \nextdef
     & \fun{consumed} \in \PParams \to \UTxO \to \StakeDelegs \to \Wdrl \to \Tx \to \Value \\
     & \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \\
     & ~~\ubalance{(\txins{tx} \restrictdom \var{utxo})} +
-        \fun{adaVal}~(\fun{wbalance}~(\fun{txwdrls}~{tx}))~+~\fun{forged}~\var{tx} \\
-    & ~~ + \fun{adaVal}~(\keyRefunds{pp}{stdelegs}{tx}) \\
+        \fun{wbalance}~(\fun{txwdrls}~{tx})~+~\fun{forged}~\var{tx} \\
+    & ~~ + \keyRefunds{pp}{stdelegs}{tx} \\
     & \text{value consumed} \\
     \nextdef
-    & \fun{produced} \in \PParams \to \StakePools \to \Tx \to \Value \\
-    & \fun{produced}~\var{pp}~\var{stpools}~\var{tx} = \\
-    &~~\ubalance{(\outs{tx})}  + \fun{adaVal}~(\txfee{tx} \\
+    & \fun{produced} \in \Slot \to \PParams \to \StakePools \to \Tx \to \Value \\
+    & \fun{produced}~\var{slot}~\var{pp}~\var{stpools}~\var{tx} = \\
+    &~~\ubalance{(\outs{slot}~{tx})}  + \txfee{tx} \\
     &~~ + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) + \\
-    &~~ \deposits{pp}{stpools}~{(\txcerts{tx})})\\
+    &~~ \deposits{pp}{stpools}~{(\txcerts{tx})}\\
     & \text{value produced} \\
   \end{align*}
   \caption{Functions used in UTxO rules}
@@ -121,17 +122,18 @@ related to sequential script validation.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{mkScrLst} \to \Tx \to \UTxO \to \seqof{(\ScriptV,\ScrInData)} \\
+    & \fun{mkScrLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptV,\ScrInData)} \\
     & \text{a list of all validators and corresponding input data} \\
-    & \fun{mkScrLst} ~\var{tx}~ \var{utxo} ~=~
-    \fun{toList}~(\fun{allCertScrts}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~{utxo}~{tx} \\
-    & ~~ \cup \fun{allInsScrts}~{utxo}~{tx}) \\
+    & \fun{mkScrLst}  ~\var{pp}~\var{tx}~ \var{utxo} ~=~
+    \fun{toList}~(\fun{allCertScrts}~\var{pp}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~\var{pp}~{utxo}~{tx} \\
+    & ~~ \cup \fun{allInsScrts}~\var{pp}~{utxo}~{tx} ~~ \cup \fun{forgedScrts}~\var{pp}~{utxo}~{tx}) \\
   \end{align*}
   \caption{Script Cost Calculations}
   \label{fig:functions:script1}
 \end{figure}
 
-In Figure \ref{fig:functions:script2}, we give the three functions
+In Figures \ref{fig:functions:script2} and \ref{fig:functions:script3},
+we give the four functions
 used for script validation for a given transaction,
 
 \begin{itemize}
@@ -141,6 +143,8 @@ wtih the data needed for validation
 \item $\fun{allWDRLSScrts}$ returns the set of all the validators locking
 the script-address reward addresses together
 wtih the data needed for validation
+\item $\fun{forgedScrts}$ returns the set of all the validators for
+forging new tokens
 \item $\fun{allInsScrts}$ returns the set of all the validators locking
 the script-address UTxO's together
 wtih the data needed for validation
@@ -198,9 +202,25 @@ fees required.
     & ~~\{ (\var{script_v},\fun{validationData}~\var{utxo}~\var{tx}~
       (a\mapsto c)) ~\vert \\
     & ~~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
-    & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}\\
-    %
+    & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}
     \nextdef
+    %
+    & \fun{forgedScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
+    & \text{check that all forging scripts in a tx validate} \\
+    & \fun{forgedScrts}~{utxo}~{tx}~=~\\
+    & ~~\{ (\var{script_v},
+    \fun{validationData}~\var{utxo}~\var{tx}~\Nothing) ~\vert \\
+    & ~~\var{cid}\mapsto ~ \wcard \in \fun{forged}~\var{tx}, \\
+    &~~\wcard\mapsto \var{script_v}\in \var{cid}\restrictdom\fun{txvlds}~{tx}
+     \} \\
+    %
+  \end{align*}
+  \caption{Scripts and their Arguments}
+  \label{fig:functions:script2}
+\end{figure}
+
+\begin{figure}[htb]
+  \begin{align*}
     & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
     & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}, (\var{dataval},\var{rdmr}, \\
@@ -219,8 +239,8 @@ fees required.
     & ~~\wcard\mapsto \var{script_v}\in
      \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}
   \end{align*}
-  \caption{Script Cost Calculations}
-  \label{fig:functions:script2}
+  \caption{Scripts and their Arguments}
+  \label{fig:functions:script3}
 \end{figure}
 
 Figure \ref{fig:ts-types:utxo-scripts} gives the transition system for the second phase of
@@ -252,8 +272,8 @@ execution units remaining that can be used to during script execution, $\var{rem
     \left(
       \begin{array}{r@{~\in~}lr}
         \var{utxo} & \UTxO & \text{UTxO}\\
-        \var{deposits} & \Coin & \text{deposits pot}\\
-        \var{fees} & \Coin & \text{fee pot}\\
+        \var{deposits} & \Value & \text{deposits pot}\\
+        \var{fees} & \Value & \text{fee pot}\\
         \var{ups} & \UpdateState & \text{update state}\\
         \var{remExU} & \ExUnits & \text{exunits remaining to spend on validation} \\
       \end{array}
@@ -404,7 +424,7 @@ will result in the funds being locked forever in the associated rewards account.
       \trans{utxos}{\epsilon}
       \left(
       \begin{array}{r}
-        \varUpdate{\var{(\txins{tx} \subtractdom \var{utxo}) \cup \outs{tx}}}  \\
+        \varUpdate{\var{(\txins{tx} \subtractdom \var{utxo}) \cup \outs{slot}~{tx}}}  \\
         \varUpdate{\var{deposits} + \var{depositChange}} \\
         \varUpdate{\var{fees} + \txfee{tx} + \var{decayed}} \\
         \varUpdate{\var{ups'}} \\
@@ -553,6 +573,8 @@ from the original Shelley spec):
 
   \item the general accounting property holds
 
+  \item no Ada is being forged
+
   \item the script fees a transaction pays are less than the max allowed
 
   \item the $\fun{txfee}~\var{tx} \leq ...$ check
@@ -587,6 +609,8 @@ from the original Shelley spec):
 
   \item all outputs of the transaction contain positive quantities
 
+  \item all Ada outputs of a transaction use the Ada token
+
   \item the transaction size does not exceed maximum
 
   \item the UTXOS state transition is valid, with the signal being
@@ -606,7 +630,9 @@ from the original Shelley spec):
       \txins{tx} \neq \emptyset
       & \txins{tx} \subseteq \dom \var{utxo}
       \\
-      \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{pp}{stpools}~{tx}
+      \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{slot}~{pp}~{stpools}~{tx}
+      \\~\\
+      \mathsf{adaID}\restrictdom utxo = \epsilon
       \\
       ~
       \\
@@ -616,14 +642,16 @@ from the original Shelley spec):
       \\
       \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) = \\
       \{\mathsf{adaID} \mapsto
-      (\mathsf{adaToken} \mapsto \var{q})~ \vert~ q \geq \txfee{tx}
+      (\mathsf{adaToken} \mapsto \var{q})~ \vert~ \\
+      \mathsf{adaID} \mapsto
+      (\mathsf{adaToken} \mapsto \var{q}) \geq \txfee{tx}
       + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) \} \\
       \minfee{pp}{tx} \leq \txfee{tx}
       \\
       ~
       \\
       \forall~\var{txin}\in\fun{txinputs}~{tx},
-      \forall \wcard \mapsto \var{txout} \in \fun{inref}~{txin}\restrictdom\var{utxo}, \\
+      \forall \wcard \mapsto \var{(txout,\wcard)} \in \fun{inref}~{txin}\restrictdom\var{utxo}, \\
       \fun{getAddr}~\var{txout} \in \AddrScr \Rightarrow
       (\fun{validatorHash}~(\fun{getAddr}~\var{txout})\in \fun{dom}~(\fun{txvlds}~{tx})) \\
       \wedge ~(\forall \wcard\mapsto \var{vld} \in
@@ -634,7 +662,7 @@ from the original Shelley spec):
       \\
       \forall~\var{(\var{txin},\var{hash_r})}\in\fun{txinputs}~{tx},
       (\var{hash_r} \in \fun{dom}(\fun{txdats}~{tx})) \\
-      \wedge~(\forall \wcard \mapsto \var{(a,c,h_d)} \in \var{txin}\restrictdom\var{utxo},
+      \wedge~(\forall \wcard \mapsto \var{(\wcard,\wcard,h_d,\wcard)} \in \var{txin}\restrictdom\var{utxo},
       \var{h_d} \in \fun{dom}(\fun{txdats}~{tx}))
       \\
       ~
@@ -665,7 +693,9 @@ from the original Shelley spec):
       \\
       ~
       \\
-      \forall (\_\mapsto (\_, (\wcard \mapsto (\wcard \mapsto q)))) \in \txouts{tx}, q \geq 0
+      \forall txout \in \txouts{tx}, txout \geq 0 \\
+      \forall cid\mapsto{tkns} \in \mathsf{adaID}\restrictdom\txouts{tx},
+      \mathsf{adaToken}\restrictdom{tkns} = {tkns}
       \\
       \fun{txsize}~{tx}\leq\fun{maxTxSize}~\var{pp}
       \\
@@ -805,7 +835,7 @@ all inputs to script validation are signed and thus not tampered with.
       \powerset{\KeyHash}
     & \text{required key hashes} \\
     &  \hspace{-0.8cm}\fun{witsVKeyNeeded}~\var{utxo}~\var{tx}~\var{dms} = \\
-    & ~~\{ \fun{paymentHK}~\fun{getAddr}~{txout} \mid i \mapsto \var{txout} \in \var{utxo},~i\in\fun{txinsVKey}~{tx} \} \\
+    & ~~\{ \fun{paymentHK}~\fun{getAddr}~{txout} \mid i \mapsto (\var{txout},\wcard) \in \var{utxo},~i\in\fun{txinsVKey}~{tx} \} \\
     \cup & ~~
            \{\fun{stakeCred_r}~a\mid a\mapsto \wcard \in \AddrRWDVKey
       \restrictdom \txwdrls{tx}\}\\

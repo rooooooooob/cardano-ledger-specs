@@ -7,7 +7,7 @@ as much as possible,
 except for the following changes:
 
 \begin{itemize}
-  \item $\Coin,~\CurrencyId,~\Token,~\Quantity$ are all types
+  \item $\CurrencyId,~\Token,~\Quantity$ are all types
   related to native multicurrency on the ledger.
 
   \item $\Yes$ and $\Nope$: These are single-value types used in tags. These
@@ -47,6 +47,9 @@ except for the following changes:
   as well as special output types for PK and script outputs. The script output
   includes a data script hash.
 
+  \item $\UTxO$ now includes the slot number the output was created in the
+  output
+
   \item $\Vlds$ are types which are finite maps for looking up
   validator scripts by hashes.
 \end{itemize}
@@ -57,7 +60,6 @@ except for the following changes:
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \var{c} & \Coin & \text{Ada value}\\
       \var{curid} & \CurrencyId & \text{currency id}\\
       \var{tok} & \Token & \text{token identifier}\\
       \var{quan} & \Quantity & \text{quantity of a token}\\
@@ -134,12 +136,12 @@ except for the following changes:
       \\
       \var{utxo}
       & \UTxO
-      & \TxIn \mapsto \TxOut
+      & \TxIn \mapsto (\TxOut \times \Slot)
 %      & \text{unspent tx outputs}
       \\
       \var{wdrl}
       & \Wdrl
-      & \AddrRWD \mapsto \Coin
+      & \AddrRWD \mapsto \Value
 %      & \text{reward withdrawal}
       \\
       \var{val}
@@ -166,7 +168,7 @@ just validation data for MSIG, and data value, redeemer and validation data for 
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
       \var{cur}
       & \CurItem
-      & \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
+      & \Nothing \uniondistinct \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
       \\
       \var{sid}
       & \ScrInData
@@ -185,6 +187,8 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
   where the first slot is accessed by $\fun{txlst}$.
+  \item The fee, now represented by type $\Value$, includes both script and
+  non-script transaction fee portions
   \item $\TxBody$ now includes $\Value$, which represents
   the tokens forged and taken out of circulation by the transaction
   \item $\TxBody$ now includes $\ExUnits$, which are the total execution units
@@ -222,7 +226,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Coin \times \ExUnits \times \Value \\
+      \times \Value \times \ExUnits \times \Value \\
     & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP^?
   \end{align*}
   %
@@ -240,6 +244,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \emph{Accessor Functions}
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
+      \fun{txfee} & \Tx \to \Slot & \text{fee as Value} \\
       \fun{txinputs} & \Tx \to \powerset{\TxInTx} & \text{transaction inputs} \\
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
       \fun{getValue} & \TxOut \to \Value & \text{output value} \\
@@ -263,12 +268,9 @@ In Figure \ref{fig:defs:functions-helper} are the helper functions used for
 processing transaction data for validation.
 
 \begin{itemize}
-  \item $\fun{adaID},~\fun{adaToken},~\fun{qu},~\fun{coi},~\fun{adaVal}$ are used
-  for converting between Ada and other currencies. $\Quantity$ and $\Coin$
-  must both be of the same underlying type to be able to convert between them.
+  \item $\fun{adaID},~\fun{adaToken}$ are
+  added for use of native currency Ada in multicurrency.
   \item $\fun{hashScript},~ \fun{hashData}$ are abstract hashing functions.
-  \item $\fun{adaVal}$ is used to create a value term from a coin Ada amount
-  \item The other functions are needed for building validationd data
   ($\fun{validationData}$ builds it).
 \end{itemize}
 
@@ -280,23 +282,12 @@ processing transaction data for validation.
     & \text{Ada currency ID} \\
     \mathsf{adaToken} \in& ~\Token
     & \text{Ada Token} \\
-    \fun{qu} \in& ~\Coin \to \Quantity
-    & \text{convert a coin amount into quantity} \\
-    \fun{coi} \in& ~\Quantity \to \Coin
-    & \text{convert a quantity into a coin value} \\
     \fun{hashScript} \in & ~\Script\to \HashScr
     & \text{compute script hash} \\
     \fun{hashData} \in & ~\Data \to \HashDat
     & \text{compute hash of data} \\
     \fun{validationData} \in & \UTxO \to \Tx \to \CurItem \to \Data
     & \text{build Validation Data} \\
-  \end{align*}
-  \emph{Helper Functions}
-  %
-  \begin{align*}
-    &\fun{adaVal} ~\in~ \Coin \to \Value \\
-    &\fun{adaVal}~{c} ~=~ \mathsf{adaID} \mapsto (\mathsf{adaToken} \mapsto  \fun{qu}~c) \\
-    & \text{make an Ada value term from a Coin} \\~\\
   \end{align*}
   \caption{Script Validation}
   \label{fig:defs:functions-helper}
@@ -319,7 +310,7 @@ takes a term of type $\ExUnits$ as a parameter and perform validation
 In order to perform the calculation which converts primitive resource use into an
 abstract units, the $\CostMod$ is also passed as parameters.
 The evaluation functions return a pair
-of the boolean validation result and the remaining $\ExUnits$ available 
+of the boolean validation result and the remaining $\ExUnits$ available
 for validation of the rest of the scripts in the transaction (if any).
 
 \begin{note}

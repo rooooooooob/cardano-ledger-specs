@@ -1,8 +1,20 @@
 \section{Protocol Parameters}
 \label{sec:protocol-parameters}
 
-The rules for the ledger depend on several parameters contained in the $\PParams$ type,
-defined in \cite{byron_ledger_spec}.
+\begin{note}
+  In this chapter, as well as the rest of this document, we no longer use the type $\Coin$.
+  All the calulations are now defined in terms of the multicurrency type $\Value$.
+  There are other places throughout the original Shelley ledger specification where
+  $\Coin$ is used, but we did not inlcude the ones where the change is strictly a type
+  change, with no change in logic. In these cases, assume the use of
+  \[\mathsf{adaID} \mapsto (\mathsf{adaToken} \mapsto \var{q})\]
+  instead of a coin value. The notation for various operations on this type
+  is overloaded as scalar operations on the individual quantities $q$, so that
+  we do not need to change the calculation notation.
+
+  Things to consider: where might we need to check that some $\Value$ is strictly
+  Ada? Other dangers?
+\end{note}
 
 For Plutus integration, we have added the following abstract types
 (see Figure~\ref{fig:defs:protocol-parameters}):
@@ -13,7 +25,7 @@ For Plutus integration, we have added the following abstract types
 \texttt{resource primitives}~$\to \ExUnits$
 \item $\Prices$: These are coefficients used to get the final price of script
 execution, i.e. to perform the calculation \\
-$\ExUnits \to \Coin$.
+$\ExUnits \to \Value$.
 \item $\ExUnits$ abstract units of resources for script execution
 \end{itemize}
 
