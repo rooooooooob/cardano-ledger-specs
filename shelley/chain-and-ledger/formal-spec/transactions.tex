@@ -253,7 +253,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
       \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
       \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
       \fun{txexunits} & \Tx \to \ExUnits & \text{portion of fee allocated for scripts}\\
-      \fun{hashPP} & \Tx \to \HashPP^? & \text{hash of the protocol params}\\
+      \fun{hashPP} & \Tx \to \HashPP^? & \text{hash of the Plutus params}\\
       \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
       \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
       \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
@@ -327,8 +327,7 @@ for validation of the rest of the scripts in the transaction (if any).
     \ExUnits \to (\IsValidating \times \ExUnits) \\
     & \text{resource-restricted validation of a multi-sig script} \\~\\
     & \fun{valPLCupTo} \in \CostMod \to\ScriptPlutus\to
-    (\Data \times \Data \times \Data \times
-    \ExUnits) \to (\IsValidating \times \ExUnits) \\
+    (\seqof{\Data} \times \ExUnits) \to (\IsValidating \times \ExUnits) \\
     & \text{resource-restricted validation of a Plutus script}
   \end{align*}
   %
@@ -336,12 +335,12 @@ for validation of the rest of the scripts in the transaction (if any).
   %
   \begin{align*}
     \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}}(\var{dataval},~\var{rdmr},~\var{ptx})
-    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~(\var{dataval},~\var{rdmr},~\var{ptx},~
+    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~((\var{dataval};~\var{rdmr};~\var{ptx};\epsilon),~
     \var{exunits})
     \nextdef
     \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}} \var{ptx}
     &=& \begin{cases}
-    \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~ \var{\Nothing}~\var{\Nothing}~\var{ptx}~
+    \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~(\var{ptx};\epsilon)~
     \var{exunits} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
     \fun{valMSIGupTo} ~\var{cm}~\var{script_v} ~\var{ptx}~
     \var{exunits} & \text{if}~\var{script_v} \in \ScriptMSig
