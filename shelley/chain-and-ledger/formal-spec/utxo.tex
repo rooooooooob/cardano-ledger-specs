@@ -603,6 +603,9 @@ from the original Shelley spec):
   \item for each script-credential certificate, the transaction
   has the full validator in the metadata
 
+  \item for each currency ID in the forged value of a transaction, the transaction
+  has the full validator in the metadata 
+
   \item the hash indexes of all validators are their correct hashes
 
   \item the hash indexes of all $\Data$ values are their correct hashes
@@ -680,6 +683,10 @@ from the original Shelley spec):
       \\
       \forall~\var{cert}\in\fun{txcerts}~{tx},~\fun{regCred}~{cert}\in \HashScr \Rightarrow \\
       \fun{regCred}~{cert} \in \fun{dom}(\fun{txvlds}~{tx}) ~\wedge~ \var{cert} \in\DCertDeRegKey
+      \\
+      ~
+      \\
+      \forall~(cid\mapsto tkns)\in\fun{forged}~{tx},~\var{cid} \in \fun{dom}(\fun{txvlds}~{tx})
       \\
       ~
       \\
