@@ -15,8 +15,8 @@ module Rules.TestUtxow
 where
 
 import           Data.Foldable (toList)
-import qualified Data.Map.Strict as Map (isSubmapOf)
-import qualified Data.Set as Set (fromList, intersection, isSubsetOf, map, null)
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import           Test.QuickCheck (Property, conjoin, (===))
 
@@ -28,7 +28,7 @@ import           Keys (hashAnyKey)
 import           Ledger.Core (dom, (<|))
 import           LedgerState (pattern UTxOState, keyRefunds)
 import           PParams (PParams)
-import           Tx (getKeyCombinations)
+import           Tx (isKeyCombination)
 import           TxData (pattern TxIn, pattern WitGVKey, pattern WitVKey, _body, _certs, _inputs,
                      _txfee, _witnessMSigMap, _witnessVKeySet)
 import           UTxO (pattern UTxO, balance, totalDeposits, txins, txouts)
@@ -171,9 +171,7 @@ requiredMSigSignaturesSubset tr =
   where
     signaturesSubset sst =
       let khs = keyHashSet sst in
-      all (existsReqKeyComb khs) (_witnessMSigMap $ signal sst)
-    existsReqKeyComb keyHashes msig  =
-      any (\kl -> (Set.fromList kl) `Set.isSubsetOf` keyHashes) (getKeyCombinations msig)
+      all (isKeyCombination khs) (_witnessMSigMap $ signal sst)
     keyHashSet sst =
       Set.map (\case
                   WitVKey vk _   -> hashAnyKey vk
