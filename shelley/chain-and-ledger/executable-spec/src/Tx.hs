@@ -25,11 +25,12 @@ module Tx
   , MultiSignatureScript
   , validateScript
   , hashScript
-  , isKeyCombination
   , txwitsScript
   , extractKeyHash
   , extractScriptHash
   , extractGenKeyHash
+  , getKeyCombinations
+  , getKeyCombination
   )
 where
 
@@ -39,6 +40,7 @@ import           Keys (AnyKeyHash, GenKeyHash, undiscriminateKeyHash)
 import           Cardano.Binary (ToCBOR (toCBOR), encodeWord8)
 import           Cardano.Crypto.Hash (hashWithSerialiser)
 import           Cardano.Ledger.Shelley.Crypto
+import qualified Data.List as List (concat, concatMap, permutations)
 import           Data.Map.Strict (Map)
 import           Data.Maybe (mapMaybe)
 import           Data.Set (Set)
@@ -91,13 +93,34 @@ hashNativeMultiSigScript msig =
   ScriptHash $ hashWithSerialiser (\x -> encodeWord8 nativeMultiSigTag
                                           <> toCBOR x) msig
 
--- | Check if a set of keys satisfies a MultiSig.
-isKeyCombination :: Set (AnyKeyHash crypto) -> MultiSig crypto -> Bool
-isKeyCombination ks (RequireSignature hk) = hk `Set.member` ks
-isKeyCombination ks (RequireAllOf msigs) = all (isKeyCombination ks) msigs
-isKeyCombination ks (RequireAnyOf msigs) = any (isKeyCombination ks) msigs
-isKeyCombination ks (RequireMOf m msigs) =
-  m == length (take m $ filter (isKeyCombination ks) msigs)
+-- | Get one possible combination of keys for multi signature script
+getKeyCombination :: MultiSig crypto -> [AnyKeyHash crypto]
+
+getKeyCombination (RequireSignature hk) = [hk]
+getKeyCombination (RequireAllOf msigs) =
+  List.concatMap getKeyCombination msigs
+getKeyCombination (RequireAnyOf msigs) =
+  case msigs of
+    []  -> []
+    x:_ -> getKeyCombination x
+getKeyCombination (RequireMOf m msigs) =
+  List.concatMap getKeyCombination (take m msigs)
+
+
+-- | Get all valid combinations of keys for given multi signature. This is
+-- mainly useful for testing.
+getKeyCombinations :: MultiSig crypto -> [[AnyKeyHash crypto]]
+
+getKeyCombinations (RequireSignature hk) = [[hk]]
+
+getKeyCombinations (RequireAllOf msigs) = [List.concat $
+  List.concatMap getKeyCombinations msigs]
+
+getKeyCombinations (RequireAnyOf msigs) = List.concatMap getKeyCombinations msigs
+
+getKeyCombinations (RequireMOf m msigs) =
+  let perms = map (take m) $ List.permutations msigs in
+    map (concat . List.concatMap getKeyCombinations) perms
 
 -- | Magic number representing the tag of the native multi-signature script
 -- language. For each script language included, a new tag is chosen and the tag
