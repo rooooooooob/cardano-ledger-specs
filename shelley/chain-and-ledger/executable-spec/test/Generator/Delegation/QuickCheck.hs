@@ -41,14 +41,13 @@ import           Generator.Core.Constants (frequencyDeRegKeyCert, frequencyDeleg
                      frequencyRegKeyCert, frequencyRegPoolCert, frequencyRetirePoolCert,
                      frequencyScriptCredDeReg, frequencyScriptCredDelegation,
                      frequencyScriptCredReg)
-import           Generator.Core.QuickCheck (genCoinList, genInteger, genWord64, toCred)
+import           Generator.Core.QuickCheck (genCoinList, genInteger, genWord64, toCred, genKeyCombination)
 import           Keys (GenDelegs (..), hashKey, vKey)
 import           Ledger.Core (dom, range, (∈), (∉))
 import           LedgerState (dstate, keyRefund, pParams, pstate, stPools, stkCreds, _dstate,
                      _genDelegs, _pstate, _stPools, _stkCreds)
 import           PParams (PParams (..), d, eMax)
 import           Slot (EpochNo (EpochNo), SlotNo (SlotNo))
-import           Tx (getKeyCombination)
 import           TxData (pattern DCertDeleg, pattern DCertGenesis, pattern DCertPool,
                      pattern Delegation, pattern KeyHashObj, pattern PoolParams, RewardAcnt (..),
                      pattern StakePools, _poolPubKey, _poolVrf)
@@ -100,7 +99,7 @@ genDCerts keys keyHashMap scripts coreKeys vrfKeys pparams dpState slot ttl = do
 
       case witnessOrCoreKeys of
         ScriptCred (_, stakeScript) -> do
-          let witnessHashes = getKeyCombination stakeScript
+          witnessHashes <- genKeyCombination stakeScript
           let witnesses =
                 Maybe.catMaybes (map (flip Map.lookup keyHashMap) witnessHashes)
           pure ( Seq.fromList certs

@@ -29,12 +29,12 @@ import           ConcreteCryptoTypes (Addr, AnyKeyHash, CoreKeyPair, DCert, DPSt
                      VrfKeyPairs)
 import           Generator.Core.Constants (maxNumGenAddr, maxNumGenInputs, minNumGenAddr,
                      minNumGenInputs)
-import           Generator.Core.QuickCheck (findPayKeyPair, findPayScript, genNatural)
+import           Generator.Core.QuickCheck (findPayKeyPair, findPayScript, genKeyCombination, genNatural)
 import           Generator.Delegation.QuickCheck (CertCred (..), genDCerts)
 import           LedgerState (pattern UTxOState)
 import           Slot (SlotNo (..))
 import           STS.Ledger (LedgerEnv (..))
-import           Tx (pattern Tx, pattern TxBody, pattern TxOut, getKeyCombination, hashScript)
+import           Tx (pattern Tx, pattern TxBody, pattern TxOut, hashScript)
 import           TxData (pattern AddrBase, pattern KeyHashObj, pattern ScriptHashObj)
 import           Updates (emptyUpdate)
 import           UTxO (pattern UTxO, balance, makeGenWitnessesVKey, makeWitnessesFromScriptKeys,
@@ -108,8 +108,8 @@ genTx (LedgerEnv slot _ pparams _) (UTxOState utxo _ _ _, dpState) keys keyHashM
     --
     -- TODO mgudemann due to problems with time-outs, we select one combination
     -- deterministically for each script. Varying the script is possible though.
-    let keysLists = map getKeyCombination $ Map.elems multiSig
-        msigSignatures = foldl Set.union Set.empty $ map Set.fromList keysLists
+    keysLists <- traverse genKeyCombination $ Map.elems multiSig
+    let msigSignatures = foldl Set.union Set.empty $ map Set.fromList keysLists
         !wits = makeWitnessesVKey txBody (spendWitnesses ++ certWitnesses)
                 `Set.union` makeGenWitnessesVKey txBody genesisWitnesses
                 `Set.union` makeWitnessesFromScriptKeys txBody keyHashMap msigSignatures

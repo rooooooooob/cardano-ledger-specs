@@ -9,6 +9,7 @@ module Generator.Core.QuickCheck
   , genCoin
   , genCoinList
   , genInteger
+  , genKeyCombination
   , genNatural
   , genWord64
   , genTxOut
@@ -32,7 +33,7 @@ module Generator.Core.QuickCheck
 import           Cardano.Crypto.VRF (deriveVerKeyVRF, genKeyVRF)
 import           Control.Monad (replicateM)
 import           Crypto.Random (drgNewTest, withDRG)
-import qualified Data.List as List (findIndex, (\\))
+import qualified Data.List as List (findIndex, (\\), concat)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (empty, fromList, insert, lookup)
 import           Data.Tuple (swap)
@@ -129,6 +130,21 @@ mkScriptsFromKeyPair (k0, k1) = (mkScriptFromKey k0, mkScriptFromKey k1)
 
 mkScriptFromKey :: KeyPair -> MultiSig
 mkScriptFromKey = (RequireSignature . hashAnyKey . vKey)
+
+-- | Generate a valid combination of keys for given multi signature.
+genKeyCombination :: MultiSig -> Gen [AnyKeyHash]
+genKeyCombination = go
+  where
+  go (RequireSignature hk) = pure [hk]
+  go (RequireAllOf msigs) = List.concat <$> traverse go msigs
+  go (RequireAnyOf []) = pure []
+  go (RequireAnyOf msigs) = do
+    msig <- head <$> QC.shuffle msigs
+    go msig
+  go (RequireMOf _ []) = pure []
+  go (RequireMOf m msigs) = do
+    msigs' <- take m <$> QC.shuffle msigs
+    List.concat <$> traverse go msigs'
 
 -- Pairs of (genesis key, node cold key)
 --
