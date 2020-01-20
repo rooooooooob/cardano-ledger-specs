@@ -29,6 +29,17 @@ $\ExUnits \to \Value$.
 \item $\ExUnits$ abstract units of resources for script execution
 \end{itemize}
 
+\begin{note}
+  If we want a record of when Plutus versions were introduced, we want to keep
+  the $\var{minPlutusVer}$ as a map $\PlutusVer \mapsto \Slot$.
+  The $\var{maxPlutusVer}$ should go into $\var{avs}$. I think both
+  $\ProtVer$ and the $\var{avs}$ application versions should go into the
+  Plutus-specific hash. Do we need a separate data type for the Plutus-relevant
+  protocol parameters (and then add the aforementioned two parameters too),
+  or should this be a selector function instead, returning the tuple of
+  useful parameters?
+\end{note}
+
 We also added several protocol parameters and accessor functions.
 
 

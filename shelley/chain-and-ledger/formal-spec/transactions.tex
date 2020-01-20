@@ -14,7 +14,10 @@ except for the following changes:
   values are used instead of booleans for clarity.
 
   \item $\ScriptPlutus$ and $\ScriptMSig$ are two types of scripts this spec
-  covers validation of
+  covers validation of. As a script type, the Plutus script is a pair of the
+  actual script and the version of the Plutus interpreter which was used to
+  make this script. Both of these pieces of data need to be passed to the
+  interpreter during script validation.
 
   \item $\IsFee$ is a tag that indicates when an input has been marked
   to be used for paying transaction fees ($\Yes$ for when it is for fees,
@@ -63,8 +66,8 @@ except for the following changes:
       \var{curid} & \CurrencyId & \text{currency id}\\
       \var{tok} & \Token & \text{token identifier}\\
       \var{quan} & \Quantity & \text{quantity of a token}\\
-      \var{plc} & \ScriptPlutus & \text{Plutus scripts} \\
       \var{msig} & \ScriptMSig & \text{Multisig scripts} \\
+      \var{spl} & \ScrPLC & \text{Plutus scripts without the version number} \\
       \var{yes} & \Yes & \text{tag type for yes} \\
       \var{no} & \Nope & \text{tag type for no} \\
     \end{array}
@@ -73,6 +76,7 @@ except for the following changes:
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
+      \var{plc} & \ScriptPlutus & \ScrPLC\times\PlutusVer & \text{Plutus scripts} \\
       \var{scr} & \Script & \ScriptPlutus \uniondistinct \ScriptMSig \\
       \var{isv} & \IsValidating & \Yes \uniondistinct \Nope \\
       \var{dat}
@@ -85,7 +89,6 @@ except for the following changes:
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\subset}lr}
-      \var{script_v}&\ScriptV & \Script & \text{validator script}\\
       \var{dataval}&\DatVal & \Data & \text{data script}\\
       \var{rdmr}&\Rdmr & \Data & \text{redeemer script}\\
     \end{array}
@@ -157,8 +160,14 @@ except for the following changes:
 The types for passing to Plutus scripts are added in Figure \ref{fig:defs:utxo-pending}.
 There is current item $\CurItem$, which represents either the current input being
 spent, the current certificated being validated, or the current reward
-withdrawal. $\ScrInData$ is all the input data for a script. It is
-just validation data for MSIG, and data value, redeemer and validation data for PLC.
+withdrawal.
+
+\begin{note}
+Instead of the two possibilities for validator inputs, just $\ValidationData$ or
+the triple $(\ValidationData, \DatVal, \Rdmr)$, the input is now a list which
+either has one item in it or three. What is the correct input order to have
+it in?
+\end{note}
 
 
 \begin{figure*}[htb]
@@ -169,11 +178,6 @@ just validation data for MSIG, and data value, redeemer and validation data for 
       \var{cur}
       & \CurItem
       & \Nothing \uniondistinct \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
-      \\
-      \var{sid}
-      & \ScrInData
-      & \Data \uniondistinct
-        (\Data \times \Data \times \Data)
     \end{array}
   \end{equation*}
   \caption{Definitions used to make Validation Data}
@@ -196,7 +200,13 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \item $\TxBody$ also has the hash of the current protocol parameters
   (only the ones relevant to Plutus script validation), $\HashPP^?$,
   which is only obligatory to include when a transaction is carrying scripts
-  \item Not as part of the body, the transaction now also includes
+  \item $\UnsignedData$ is the part of the transaction that is outside the
+  (signed) body.
+  It contains all the data that does not need to be signed because either
+  this data is either
+  a) signatures, b) its hash is in the body or on-chain, c) it is a tag
+  added by the creator of the block, or d) it is other kinds of metadata
+  \item $\UnsignedData$ includes
   a finite map lookup $\Vlds$ to avoid having multiple
   copies of the validator (one for each input spending from that script).
   \item $\HashDat \mapsto \Data$ is a similar lookup for $\Data$.
@@ -232,12 +242,16 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{wit} & \TxWitness & (\VKey \mapsto \Sig)
+      \var{wit} & \TxWitness & \VKey \mapsto \Sig
+      \\
+      \var{unsignedData} ~\in~
+      & \UnsignedData ~=~
+      & \TxWitness \times \Vlds \times (\HashDat \mapsto \Data)
+            \times \IsValidating
       \\
       \var{tx}
       & \Tx
-      & \TxBody \times \TxWitness \times \Vlds \times (\HashDat \mapsto \Data)
-      \times \IsValidating
+      & \TxBody \times \UnsignedData
     \end{array}
   \end{equation*}
   %

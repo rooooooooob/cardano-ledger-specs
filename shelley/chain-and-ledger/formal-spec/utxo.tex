@@ -122,7 +122,7 @@ related to sequential script validation.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{mkScrLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptV,\ScrInData)} \\
+    & \fun{mkScrLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptV,\seqof{\Data})} \\
     & \text{a list of all validators and corresponding input data} \\
     & \fun{mkScrLst}  ~\var{pp}~\var{tx}~ \var{utxo} ~=~
     \fun{toList}~(\fun{allCertScrts}~\var{pp}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~\var{pp}~{utxo}~{tx} \\
@@ -186,7 +186,7 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allCertScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV \times \ScrInData)} \\
+    & \fun{allCertScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV \times \seqof{\Data})} \\
     & \text{check that all certificate witnessing scripts in a tx validate} \\
     & \fun{allCertScrts}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v},
@@ -196,7 +196,7 @@ fees required.
      \} \\
     %
     \nextdef
-    & \fun{allWDRLSScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
+    & \fun{allWDRLSScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\seqof{\Data})} \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
     & \fun{allWDRLSScrts}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v},\fun{validationData}~\var{utxo}~\var{tx}~
@@ -205,7 +205,7 @@ fees required.
     & ~~\wcard\mapsto \var{script_v}\in \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}
     \nextdef
     %
-    & \fun{forgedScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
+    & \fun{forgedScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\seqof{\Data})} \\
     & \text{check that all forging scripts in a tx validate} \\
     & \fun{forgedScrts}~{utxo}~{tx}~=~\\
     & ~~\{ (\var{script_v},
@@ -221,9 +221,9 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\ScrInData)} \\
+    & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\seqof{\Data})} \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
-    & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}, (\var{dataval},\var{rdmr}, \\
+    & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}; (\var{dataval};\var{rdmr}; \\
     & ~~ \fun{validationData}~\var{utxo}~\var{tx}~
       (txid,ix,\var{hash_r}))) ~\vert \\
     & ~~(txid,ix,\var{hash_r}) \in \fun{txinputs}~\var{tx}, \\
@@ -284,7 +284,7 @@ execution units remaining that can be used to during script execution, $\var{rem
   \begin{equation*}
     \_ \vdash
     \var{\_} \trans{utxos}{\_} \var{\_}
-    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{\ScriptV\times\ScrInData} \times \ValState)
+    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{(\ScriptV\times\seqof{\Data})} \times \ValState)
   \end{equation*}
   %
   \caption{UTxO script validation types}
@@ -604,7 +604,7 @@ from the original Shelley spec):
   has the full validator in the metadata
 
   \item for each currency ID in the forged value of a transaction, the transaction
-  has the full validator in the metadata 
+  has the full validator in the metadata
 
   \item the hash indexes of all validators are their correct hashes
 
