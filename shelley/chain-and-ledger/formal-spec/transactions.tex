@@ -396,7 +396,7 @@ ledger values will always be Ada-specific, so there is no reason to use $\Quanti
   %
   \begin{align*}
     \fun{toValue} \in & ~\Coin\to \Value \\
-    \fun{toValue} c = & \{\mathsf{adaID} \mapsto \{(\mathsf{adaToken} \mapsto \fun{qu}~c)\}\}
+    \fun{toValue}~ c = & \{\mathsf{adaID} \mapsto \{(\mathsf{adaToken} \mapsto \fun{qu}~c)\}\} \\
     \text{convert a Coin amount to a Value} \\
   \end{align*}
   \caption{Multicurrency}
@@ -456,10 +456,6 @@ are presented.
     \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}}(\var{dataval},~\var{rdmr},~\var{ptx})
     &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~((\var{dataval};~\var{rdmr};~\var{ptx};\epsilon),~
     \var{exunits})
-    \nextdef
-    \llbracket \var{script_v} \rrbracket \var{ptx}
-    &=&
-    \fun{valMSigupTo}~\var{script_v} ~\var{tx}~
   \end{align*}
   \caption{Script Validation, cont.}
   \label{fig:defs:functions-valid}

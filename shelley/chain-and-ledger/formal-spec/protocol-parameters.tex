@@ -167,7 +167,7 @@ types of scripts. Recall here that these only have non-trivial values for
   %
   \begin{align*}
     & \fun{hashPlutusPP} \in \PParams \to \powerset{(\PlutusVer)} \to \HashPP   \\
-    & \fun{hashPlutusPP}~\var{pp}~\var{pv} = \fun{hash} (\fun{toList} (\var{pv} \restrictdom \fun{costmdls})) \\
+    & \fun{hashPlutusPP}~\var{pp}~\var{pv} = \fun{hash} (\fun{toList} (\var{pv} \restrictdom \var{costmdls})) \\
     & \text{this calculation hashes the current protocol parameters relevant to
     the given set of versions}
   \end{align*}
