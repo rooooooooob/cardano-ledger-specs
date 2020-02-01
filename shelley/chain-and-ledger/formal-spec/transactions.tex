@@ -1,60 +1,95 @@
 \section{Transactions}
 \label{sec:transactions}
 
+In this chapter, we outline the changes necessary to transaction and
+UTxO structure to make it possible to use Plutus scripts to validate
+certain actions.
+
 In Figure \ref{fig:defs:utxo-shelley-1}, we give the transaction types modified
-to support Plutus scripts. These types are consistent with the Shelley ledger
+to support Plutus. These types are consistent with the Shelley ledger
 as much as possible,
-except for the following changes:
+except for the following changes and additions:
 
 \begin{itemize}
-  \item $\CurrencyId,~\Token,~\Quantity$ are all types
+  \item $\ScriptHashMSig$ and $\ScriptHashPlutus$ are distinct types for hashes
+  of Plutus and MSig scripts
+
+  \item $\Token,~\Quantity$ are types
   related to native multicurrency on the ledger.
 
   \item $\Yes$ and $\Nope$: These are single-value types used in tags. These
   values are used instead of booleans for clarity.
 
-  \item $\ScriptPlutus$ and $\ScriptMSig$ are two types of scripts this spec
-  covers validation of. As a script type, the Plutus script is a pair of the
+  \item $\ScrPLC$ and $\ScriptMSig$ are two types of scripts this spec
+  covers validation of, Plutus and the native multisignature scripts already supported.
+
+  \item $\ScriptPlutus$ is a pair of the actual Plutus script and the version of the
+  interpreter using which it was made. Recall that the version number is
+  used to call the interpreter specific to that version
+
+  As a script type, the Plutus script is a pair of the
   actual script and the version of the Plutus interpreter which was used to
   make this script. Both of these pieces of data need to be passed to the
   interpreter during script validation.
 
-  \item $\IsFee$ is a tag that indicates when an input has been marked
-  to be used for paying transaction fees ($\Yes$ for when it is for fees,
-  $\Nope$ when it is not).
+  \item $\Script$ is a sum type for all types of scripts
 
   \item $\IsValidating$ is a tag that indicates when a transaction is
   expected to have all the scripts inside it validate.
-  This value is added by the slot leader when
-  constructing a block, and checked when a node runs all the scripts.
+  This value is added by the block creator when
+  constructing a block, and is checked as part of running scripts.
   $\Yes$ for when it is for when all scripts will validate,
   $\Nope$ is for when one of them does not.
 
-  \item $\Data$: is the type of all arguments passed to the validator script.
-
-  \item $\ScriptV,~ \Rdmr,~ \DatVal$: are the types of the validator,
-  redeemer and data.
-
   \item $\Value$ is the multicurrency type used to represent
-  both fungible and non fungible tokens
+  both fungible and non fungible tokens. The key of this finite map type is
+  the hash of the monetary policy script for tokens of this currency.
+  This hash is referred to as the ID of the currency. Within a single
+  currency, there may be tokens with different token identifiers
+  (of type $\Token$). Tokens with different currency IDs
+  or different token identifiers are not fungible with each other.
 
-  \item $\TxInScr$: A transaction input spending a script output. It must
-  include the hash of the redeemer.
+  \item $\IsFee$ is a tag that indicates when an input has been marked
+  to be used for paying transaction fees ($\Yes$ for when it is for fees,
+  $\Nope$ when it is not). The purpose of this tag is to give users a way to prevent
+  the entire value of the UTxO entries spent by the transaction
+  from going into the fee pot in case of script validation failure.
+  Instead, only the total amount referenced by for-fees inputs goes
+  to the fee pot.
 
-  \item $\TxInTx$: A transaction input (now distinct from the input $\TxIn$ in
-  a UTxO entry). Can be a PK-address spending input
-  (in which case $\IsFee$ indicates if this input should be used to pay script execution
-  fees), or a script-spending input.
+  Note that in the extended UTxO model, it is possible for a transaction
+  to either be processed full, or do nothing but pay fees for script
+  validation (in the case of script validation failure, see Section
+  \ref{sec:utxo} for details). All inputs can be marked as for-fees in
+  the name of privacy concerns.
 
-  \item $\TxOut,~\TxOutVK,~\TxOutScr$: An arbitrary output type (script or PK),
-  as well as special output types for PK and script outputs. The script output
-  includes a data script hash.
+  \item $\TxInTx$ is a transaction input (now distinct from the input $\TxIn$ in
+  a UTxO entry). It includes the reference to the UTxO entry it is spending
+  (the $\TxIn$ part) and the $\IsFee$ tag, which indicates if this input should
+  be used to pay script execution fees. Only VK-spending inputs can be used to
+  pay fees.
 
-  \item $\UTxO$ now includes the slot number the output was created in the
-  output
+  \item $\TxOut,~\TxOutVK,~\TxOutScr$: An sum output type ,
+  as well as special output types for either VK or native scripts, or
+  specifically Plutus script outputs. The script output
+  includes a data-value hash used to look up the full data-value.
 
-  \item $\Vlds$ are types which are finite maps for looking up
+  \item $\UTxO$ entries now include the slot numbers (to indicate when the
+  outputs were created).
+  This feature will be used for functionality that will be added in the future
+
+  \item $\Vlds$ is a finite map for looking up Plutus
   validator scripts by hashes.
+
+  \item $\CurItem$ is either the hash of a
+  forging script, the current input being
+  spent, the current reward
+  withdrawal, or the current certificate being validated.
+  This current item is a sum type of all the types of things a script may be used
+  for validating.
+
+  \item $\Rdmrs$ is a finite map for looking up the hash of the redeemer script
+  that corresponds to the current item being validated
 \end{itemize}
 
 
@@ -63,7 +98,8 @@ except for the following changes:
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \var{curid} & \CurrencyId & \text{currency id}\\
+      \var{h} &\ScriptHashMSig & \text{multisig script hash}\\
+      \var{h} &\ScriptHashPlutus & \text{Plutus script hash}\\
       \var{tok} & \Token & \text{token identifier}\\
       \var{quan} & \Quantity & \text{quantity of a token}\\
       \var{msig} & \ScriptMSig & \text{Multisig scripts} \\
@@ -99,7 +135,7 @@ except for the following changes:
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
       \var{val} & \Value
-      & \CurrencyId \mapsto (\Token \mapsto \Quantity)
+      & \ScriptHashPlutus \mapsto (\Token \mapsto \Quantity)
 %      & \text{a collection of tokens}
       \\
       \var{isf}
@@ -107,19 +143,9 @@ except for the following changes:
       & \Yes \uniondistinct \Nope
 %      & \text {tag for inputs used to pay script fees}
       \\
-      (\var{txid}, \var{ix})
-      & \type{TxIn}
-      & \TxId \times \Ix
-%      & \text{UTxO entry reference}
-      \\
-      (\var{txid}, \var{ix}, \var{hash_r})
-      & \type{TxInScr}
-      & \TxIn \times \HashDat
-%      & \text{script input}
-      \\
       \var{txin}
       & \TxInTx
-      & (\TxIn \times \IsFee) \uniondistinct \TxInScr
+      & \TxIn \times \IsFee
 %      & \text{transaction input}
       \\
       (\var{addr}, v)
@@ -129,7 +155,7 @@ except for the following changes:
       \\
       (\var{addr}, v, \var{hashscr_d})
       & \type{TxOutScr}
-      & \type{TxOutVK} \times \HashDat
+      & \type{TxOutVK} \times \DataHash
 %      & \text{script address output}
       \\
       \var{txout}
@@ -142,111 +168,139 @@ except for the following changes:
       & \TxIn \mapsto (\TxOut \times \Slot)
 %      & \text{unspent tx outputs}
       \\
-      \var{wdrl}
-      & \Wdrl
-      & \AddrRWD \mapsto \Value
-%      & \text{reward withdrawal}
-      \\
       \var{val}
       & \Vlds
-      & \HashScr \mapsto \Script
+      & \ScriptHashPlutus \mapsto \ScriptPlutus
 %      & \text{hash and validator}
+      \\
+      \var{cur}
+      & \CurItem
+      & \ScriptHashPlutus \uniondistinct \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
+%      & \text{item the script is validated for}
+      \\
+      \var{rdmrs}
+      & \Rdmrs
+      & \CurItem \mapsto \DataHash
+%      & \text{redeemer for the current item}
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system}
   \label{fig:defs:utxo-shelley-1}
 \end{figure*}
 
-The types for passing to Plutus scripts are added in Figure \ref{fig:defs:utxo-pending}.
-There is current item $\CurItem$, which represents either the current input being
-spent, the current certificated being validated, or the current reward
-withdrawal.
-
-\begin{note}
-Instead of the two possibilities for validator inputs, just $\ValidationData$ or
-the triple $(\ValidationData, \DatVal, \Rdmr)$, the input is now a list which
-either has one item in it or three. What is the correct input order to have
-it in?
-\end{note}
-
-
-\begin{figure*}[htb]
-  \emph{Validation Data Types}
-  %
-  \begin{equation*}
-    \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{cur}
-      & \CurItem
-      & \Nothing \uniondistinct \TxInTx \uniondistinct \Wdrl \uniondistinct \DCert
-    \end{array}
-  \end{equation*}
-  \caption{Definitions used to make Validation Data}
-  \label{fig:defs:utxo-pending}
-\end{figure*}
-
-
-In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
+In Figure \ref{fig:defs:utxo-shelley-2}, the we have made the following changes to
+the body of the transaction:
 
 \begin{itemize}
-  \item $\TxBody$ was changed to have inputs of type $\TxInTx$, and the
+  \item transaction inputs have the type $\TxInTx$
+  \item the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
   where the first slot is accessed by $\fun{txlst}$.
-  \item The fee, now represented by type $\Value$, includes both script and
+  \item the fee a transaction is paying is the sum total of the script and the
   non-script transaction fee portions
-  \item $\TxBody$ now includes $\Value$, which represents
-  the tokens forged and taken out of circulation by the transaction
-  \item $\TxBody$ now includes $\ExUnits$, which are the total execution units
-  that will be used by all scripts
-  \item $\TxBody$ also has the hash of the current protocol parameters
-  (only the ones relevant to Plutus script validation), $\HashPP^?$,
-  which is only obligatory to include when a transaction is carrying scripts
-  \item $\UnsignedData$ is the part of the transaction that is outside the
-  (signed) body.
-  It contains all the data that does not need to be signed because either
-  this data is either
-  a) signatures, b) its hash is in the body or on-chain, c) it is a tag
-  added by the creator of the block, or d) it is other kinds of metadata
-  \item $\UnsignedData$ includes
-  a finite map lookup $\Vlds$ to avoid having multiple
-  copies of the validator (one for each input spending from that script).
-  \item $\HashDat \mapsto \Data$ is a similar lookup for $\Data$.
-  The full data script is now optional to include in a transaction when
-  paying to a script. It is never
-  stored on-chain and is only provided for the spender of the output
-  to be able to look it up when necessary (i.e. when spending the output),
-  provided the block that contained it is still available to the spender.
+  \item the body now includes $\Value$, which represents
+  the tokens forged (or taken out of circulation) by the transaction
+  \item the body now includes $\ExUnits$, which is the total quantity of execution units
+  that may be used by all Plutus scripts in the transaction.
+  This execution units "budget" is pre-computed off-chain by a Plutus interpreter
+  before the transaction is submitted
+  \item the body has the hash of the current protocol parameters
+  (only the ones relevant to Plutus script validation of each Plutus
+  version of the transaction's validators), $\HashPP$.
+  \item The body also included a map from scripts to redeemer hashes, $\Rdmrs$,
+  so that they can be looked up and used for non-output locking scripts
+\end{itemize}
+
+\textbf{Additional Role of Signatures on TxBody.}
+Note that the transaction body must contain every bit of data
+(or at least the hash of the data) that can influence the
+of on-chain transfer of value resulting from this transaction being processed
+(see Figure \ref{fig:defs:utxo-shelley-2}).
+In the classic UTxO case, this means that, for example,
+every input being spent and every output being created are in the body.
+
+In the EUTxO case, this means additionaly including everything in the body that can change
+the validation outcome of a transaction between "fully validated", and "only
+paying fees" (two distinct cases of value transfer, which
+we will explain in Section~\ref{sec:utxo}).
+
+In both cases, the body of the transaction is necessarily signed. The signatures
+are outside the body of the transaction.
+In both the basic and extended UTxO model, it is signed by every key
+whose outputs are being spent. In the extended case, this additionally offers
+protection from tampering with Plutus interpreter arguments, which may cause
+script validation failure (thus putting the transaction in the "only paying fees" case).
+In particular, the hashes of all the redeemers are signed, since $\Rdmrs$ is inside
+  the body.
+
+Anyone whose tokens are being spent as part of a given transaction
+signs the transaction body. The body also includes the for-fee tags attached to inputs.
+Because of this, the users whose tokens are being spent by the transaction have
+signed their selection of
+inputs that will be put in the fee pot in case of script validation failure.
+With this body structure, like in the basic UTxO case, a change in the body of the transaction
+will make the transaction completely invalid, rather than cause the fee-paying script validation
+failure or change the amount of fees it pays.
+
+\textbf{UnsignedData.}
+$\UnsignedData$ contains everything else in the transaction that is outside the
+body (see Figure \ref{fig:defs:utxo-shelley-2}).
+It contains all the data that does not need to be signed because either
+this data is itself signatures, its hash is in the body or on-chain, it is a tag
+added by the creator of the block, or it is other kinds of metadata. It includes
+the following:
+
+\begin{itemize}
+  \item a finite map $\Vlds$ containing hash-indexed Plutus validator scripts
+  \item $\DataHash \mapsto \Data$ is a similar structure for $\Data$.
+  This is where data-values and redeemers are stored.
+  The full data-values for the outputs a transaction is creating
+  are now optional to include in a transaction when
+  paying to scripts - if the are included, they will be contained in
+  this finite map. They are never
+  stored on-chain and are only provided so that when this output is being spent,
+  the spender is
+  able to look up the full data-value in the block containing the transaction
+  that created this output. Alternatively, the creator of the output
+  may communicate the full data-value to the spender of the output by
+  other means.
   Supplying the full data script increases the size of the transaction and
   thus the fees.
   \item $\IsValidating$ is now part of the $\Tx$ type. This is a tag that is
-  set by the slot leader submitting the block containing this transaction.
+  set by the user submitting the block containing this transaction.
+  Its correctness is verified as part of the ledger rules, and the block is
+  deemed invalid if this tag is applied incorrectly.
   It can later be used to re-apply blocks without performing script validation
   again.
-  \item $\TxWitness$ is changed to exclude script witnesses. Only PK ones
-  are included. Scripts are handled separately.
-  \item $\fun{txinputs}$ type changed to map to $\TxInTx$
-  \item Accessor functions added
 \end{itemize}
 
+Note also that we have changed the type $\TxWitness$ to have
+keys that are strictly $\ScriptHashMSig$, because multisig scripts are
+processed similar to signature witnessing.
 
+We have changed $\fun{txinputs}$ to map to $\TxInTx$, and added other the relevant
+accessor functions.
 
 \begin{figure*}[htb]
   \emph{Transaction Types}
   %
   \begin{align*}
+    \var{wits} ~\in~ & \TxWitness & (\VKey \mapsto \Sig, \ScriptHashMSig \mapsto \Script)
+  \end{align*}
+  %
+  \begin{align*}
     \var{txbody} ~\in~
     & \TxBody ~=~
     & \powerset{\TxInTx} \times (\Ix \mapsto \TxOut) \times \seqof{\DCert}
-      \times \Value \times \ExUnits \times \Value \\
-    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP^?
+      \times \Value \times \ExUnits \times \Coin \\
+    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP \times \Rdmrs
   \end{align*}
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{wit} & \TxWitness & \VKey \mapsto \Sig
-      \\
       \var{unsignedData} ~\in~
       & \UnsignedData ~=~
-      & \TxWitness \times \Vlds \times (\HashDat \mapsto \Data)
+      & \TxWitness \times \Vlds \times (\DataHash \mapsto \Data)
             \times \IsValidating
       \\
       \var{tx}
@@ -258,91 +312,142 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the following types have changed:
   \emph{Accessor Functions}
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \fun{txfee} & \Tx \to \Slot & \text{fee as Value} \\
       \fun{txinputs} & \Tx \to \powerset{\TxInTx} & \text{transaction inputs} \\
       \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
       \fun{getValue} & \TxOut \to \Value & \text{output value} \\
       \fun{getAddr} & \TxOut \to \Addr & \text{output address} \\
       \fun{inref} & \TxInTx \to \TxIn & \text{input reference $(txid,ix)$} \\
-      \fun{getDataHash} & \TxOut \to \HashDat & \text{data script hash} \\
+      \fun{getDataHash} & \TxOut \to \DataHash & \text{data script hash} \\
       \fun{forged} & \Tx \to \Value & \text{value forged by tx}\\
       \fun{txexunits} & \Tx \to \ExUnits & \text{portion of fee allocated for scripts}\\
-      \fun{hashPP} & \Tx \to \HashPP^? & \text{hash of the Plutus params}\\
+      \fun{hashPP} & \Tx \to \HashPP & \text{hash of the Plutus params}\\
       \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
-      \fun{txvlds} & \Tx \to \Vlds & \text{validator scripts}\\
-      \fun{txdats} & \Tx \to (\HashDat \mapsto \Data) & \text{data scripts}\\
+      \fun{txvlds} & \Tx \to \Vlds & \text{Plutus validator scripts}\\
+      \fun{txdats} & \Tx \to (\DataHash \mapsto \Data) & \text{data scripts}\\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
   \label{fig:defs:utxo-shelley-2}
 \end{figure*}
 
-
-In Figure \ref{fig:defs:functions-helper} are the helper functions used for
-processing transaction data for validation.
+In Figure \ref{fig:defs:functions-helper} are the following helper functions,
 
 \begin{itemize}
-  \item $\fun{adaID},~\fun{adaToken}$ are
-  added for use of native currency Ada in multicurrency.
-  \item $\fun{hashScript},~ \fun{hashData}$ are abstract hashing functions.
-  ($\fun{validationData}$ builds it).
+  \item $\mathsf{adaID}$ is a random script hash value with no known associated
+  script. It is the currency ID of Ada. While extremely unlikely, guessing a
+  script that hashes to this value
+  and validates will allow a user to forge unlimited amounts of Ada
+  \item $\mathsf{adaToken}$ is a byte string representation of the word "Ada".
+  The ledger should never allow the use of any other token name associated
+  with Ada's currency ID
+  \item $\fun{qu}$ and $\fun{co}$ are type conversions from quantity to
+  coin. Both of these types are synonyms for $\Z$, so they are
+  type re-naming conversions that are mutual inverses, with
+
+  $\fun{qu} ~(\fun{co} ~q )~= ~q$, and
+
+  $\fun{co}~ (\fun{qu}~ c) ~=~ c$, for $c \in \Coin,~q \in \Quantity$.
+
+  \item $\fun{toValue}$ takes a coin value and generates a $\Value$ type representation
+  of it
 \end{itemize}
+
+\textbf{The Use of Coin vs Value Tokens}
+The $\Coin$ type is used to represent an amount of Ada (e.g., the transaction
+fee field still has the type $\Coin$). It is made up of a single
+integer value. An amount of Ada can also be represented as a multicurrency value
+using the notation in Figure \ref{fig:defs:functions-helper}, as
+$\fun{toValue} c$ where $c \in \Coin$.
+
+The reason for retaining the specialized $\Coin$ type is the certain variables
+in the ledger state may only be considered as amounts of Ada, and this can
+never change, as they will be meaningless for the proof-of-stake protocol
+otherwise. This document
+covers the whole scope of changes of $\Coin$ to $\Value$. Everywhere else $\Coin$
+is used in the ledger must remain so.
+
+Note that there was, of course, the option of eliminating $\Coin$ entirely,
+and using $\Value$ everywhere. This would require adding a number of checks
+to make sure the ledger variables remain Ada-only. It would also require
+defining unnecessarily complicated non-integral operations on the finite map
+type $\Value$. These calculations would be meaningless for any term of type
+$\Value$ that does not represent only Ada tokens. The advantage of this approach
+would be to show the universality of multicurrency, but it does not
+justify the inconvenience and potential for bugs.
+
+We have also considered using $\Quantity$ in such cases. Again, the Ada-only
+ledger values will always be Ada-specific, so there is no reason to use $\Quantity$.
+
 
 \begin{figure*}[htb]
   \emph{Abstract Functions and Values}
   %
   \begin{align*}
-    \mathsf{adaID} \in& ~\CurrencyId
+    \mathsf{adaID} \in& ~\ScriptHashPlutus
     & \text{Ada currency ID} \\
     \mathsf{adaToken} \in& ~\Token
     & \text{Ada Token} \\
-    \fun{hashScript} \in & ~\Script\to \HashScr
-    & \text{compute script hash} \\
-    \fun{hashData} \in & ~\Data \to \HashDat
-    & \text{compute hash of data} \\
-    \fun{validationData} \in & \UTxO \to \Tx \to \CurItem \to \Data
-    & \text{build Validation Data} \\
+    \mathsf{co} \in& ~\Quantity \to \Coin
+    & \text{type conversion} \\
+    \mathsf{qu} \in& ~\Coin \to \Quantity
+    & \text{type conversion} \\
   \end{align*}
-  \caption{Script Validation}
+  \emph{Helper Functions}
+  %
+  \begin{align*}
+    \fun{toValue} \in & ~\Coin\to \Value \\
+    \fun{toValue} c = & \{\mathsf{adaID} \mapsto \{(\mathsf{adaToken} \mapsto \fun{qu}~c)\}\}
+    \text{convert a Coin amount to a Value} \\
+  \end{align*}
+  \caption{Multicurrency}
   \label{fig:defs:functions-helper}
 \end{figure*}
 
-
-In Figure \ref{fig:defs:functions-valid}, functions for script validation
+In Figure \ref{fig:defs:functions-valid}, abstract functions for script validation
 are presented.
 
 \begin{itemize}
-  \item $\fun{valMSIGupTo}$ performs validation for multi-sig scripts
-  (this does not require data or redeemer scripts).
-  \item $\fun{valPLCupTo}$ performs validation for Plutus scripts.
+  \item $\fun{validationData}$ constructs the PendingTx value passed
+  to the script interpreter
+  \item $\fun{hashScript},~ \fun{hashData}$ are abstract hashing functions.
+  \item $\fun{valMSigupTo}$ (replacing $\fun{evaluateScript}$ in the ledger spec) performs
+  validation for multi-sig scripts.
+  This validation works exactly as before.
+  \item $\fun{valPLCupTo}$ performs validation for Plutus scripts. It takes the following
+  arguments:
+  \begin{itemize}
+  \item A cost model. The specific cost model is selected according to the Plutus
+  version of the script, and is passed to allow the interpreter to do the
+  correct conversion of the quantity of resource primitives the script validation
+  computation used into $\ExUnits$. T
+  \item
+  a list of three terms of type $\Data$ (the data-value, redeemer,
+  and the PendingTx).
+  \item the execution units budget (the maximum $\var{exunits}$
+  the validation is allowed to use)
+  \end{itemize}
+  The script validation function outputs the pair of the validation result
+  and the remaining execution units (after the ones used by script execution
+  have been subtracted). Note that script exeuction stops if the full execution
+  units budget has been spent before the validation is complete.
 \end{itemize}
 
-These functions take their corresponding parameters (no data or redeemer
-scripts in the case of multisig). They also
-takes a term of type $\ExUnits$ as a parameter and perform validation
-\textit{limited by resources indicated by} this value.
-In order to perform the calculation which converts primitive resource use into an
-abstract units, the $\CostMod$ is also passed as parameters.
-The evaluation functions return a pair
-of the boolean validation result and the remaining $\ExUnits$ available
-for validation of the rest of the scripts in the transaction (if any).
-
-\begin{note}
-  $\fun{valScriptUpTo}$  is the name of the function that replaces
-  $\fun{evaluateScript}$ in the existing multi-sig script validation
-  scheme in the ledger spec.
-\end{note}
 
 \begin{figure*}[htb]
   \emph{Script Validation Functions}
   %
   \begin{align*}
-    & \fun{valMSIGupTo} \in \CostMod \to\ScriptMSig\to \Data \to
-    \ExUnits \to (\IsValidating \times \ExUnits) \\
-    & \text{resource-restricted validation of a multi-sig script} \\~\\
-    & \fun{valPLCupTo} \in \CostMod \to\ScriptPlutus\to
+     &\fun{hashScript} \in  ~\Script\to \ScriptHash \\
+     &\text{compute script hash} \\~\\
+     &\fun{hashData} \in  ~\Data \to \DataHash \\
+     &\text{compute hash of data} \\~\\
+     &\fun{validationData} \in  \UTxO \to \Tx \to \CurItem \to \Data \\
+     &\text{build Validation Data} \\~\\
+     &\fun{valMSigupTo} \in\ScriptMSig\to \Tx \to \IsValidating  \\
+     &\text{validation of a multi-sig script} \\~\\
+     &\fun{valPLCupTo} \in \CostMod \to\ScrPLC \to
     (\seqof{\Data} \times \ExUnits) \to (\IsValidating \times \ExUnits) \\
-    & \text{resource-restricted validation of a Plutus script}
+     &\text{resource-restricted validation of a Plutus script}
   \end{align*}
   %
   \emph{Notation}
@@ -352,13 +457,9 @@ for validation of the rest of the scripts in the transaction (if any).
     &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~((\var{dataval};~\var{rdmr};~\var{ptx};\epsilon),~
     \var{exunits})
     \nextdef
-    \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}} \var{ptx}
-    &=& \begin{cases}
-    \fun{valPLCupTo} ~\var{cm}~\var{script_v} ~(\var{ptx};\epsilon)~
-    \var{exunits} ~& \text{if}~\var{script_v} \in \ScriptPlutus \\
-    \fun{valMSIGupTo} ~\var{cm}~\var{script_v} ~\var{ptx}~
-    \var{exunits} & \text{if}~\var{script_v} \in \ScriptMSig
-      \end{cases}\\
+    \llbracket \var{script_v} \rrbracket \var{ptx}
+    &=&
+    \fun{valMSigupTo}~\var{script_v} ~\var{tx}~
   \end{align*}
   \caption{Script Validation, cont.}
   \label{fig:defs:functions-valid}

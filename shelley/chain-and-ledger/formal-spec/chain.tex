@@ -57,9 +57,57 @@
 \label{sec:block-body-trans}
 
 
-In Figure~\ref{fig:rules:bbody}, we have added the check that the sum total of
-script fees transaction in a block pay do not exceed the maximum total fees per
+In Figure~\ref{fig:rules:bbody}, we have added two checks :
+
+\begin{itemize}
+  \item the check that the sum total of
+script fees all transactions in a block pay do not exceed the maximum total fees per
 block (stored as a protocol parameter).
+
+  \item a check that, for every transaction in the block being validated,
+the hash of the subset of protocol parameters in the transaction body is equal to
+as the hash of the same subset of protocol parameters currently on the ledger
+\end{itemize}
+
+To select the right subset of ledger protocol parameters to hash, we need to
+first make a set of all the interpreter versions of all the scripts the
+transaction is carrying. This is done by the function $\fun{versions}$,
+see Figure \ref{fig:defs:functions-chain-helper}. Then, the parameters
+relevant to all those versions are selected and hashed by $\fun{hashPlutusPP}$.
+
+Note that at this time, only data from the protocol parameters must be hashed
+for the comparison we defined. For future Plutus versions, parts of the ledger
+state may need to be included in this hash as well, if they are passed as
+arguments to the new interpreter versions. Note also that data from the UTxO
+is passed to the interpreter, but does not require this type of hash comparison.
+This is because if the entries the transaction being processed is trying to
+spend have already been spent, there is a phase 1 validation check that
+will fail.
+
+\textbf{Parameter Hash Comparison Considerations.}
+In the future, additional functionality may be supported by the ledger that
+allows a sequence of transactions built over a period of time to be put on-chain
+as a single transaction. Over this period of time, the parameter or ledger
+data that must be passed as an argument to script interpreters could have changed.
+The resulting transaction to be put on the chain (that contains the whole sequence of
+transactions) is still obligated to include the hash of the current parameters
+and any additional script processing fees.
+
+Additional fees may be required because of the changes in prices or the cost model
+for script interpreter versions of the scripts inside the transaction.
+
+\begin{figure*}[htb]
+  \emph{Abstract Functions and Values}
+  %
+  \begin{align*}
+    \fun{versions} \in& \Vlds \to \powerset{(\PlutusVer)} \\
+    \fun{versions} \\
+    \text{Ada currency ID} \\
+  \end{align*}
+  \caption{Script Validation}
+  \label{fig:defs:functions-chain-helper}
+\end{figure*}
+
 
 \begin{figure}[ht]
   \begin{equation}\label{eq:bbody}
@@ -77,10 +125,7 @@ block (stored as a protocol parameter).
       \\~\\
       \sum_{tx\in txs} \fun{txexunits}~{tx} \leq \fun{maxBlockExUnits}~\var{pp}
       \\~\\
-      ((\var{utxo}, \wcard, \wcard, \wcard), \wcard) := ls \\
-      \var{h_{pp}} := \fun{hash}~(\fun{getPlutusPP}~\var{pp}) \\
-      \forall~tx\in txs,~\fun{mkScrLst}~\var{tx}~\var{utxo}~\neq~\epsilon
-      \Rightarrow ~\fun{hashPP}~{tx} = \var{h_{pp}}
+      \forall~tx\in txs,~\fun{hashPlutusPP}~\var{pp}~(\fun{versions}~(\fun{txvlds}~\var{tx})) =  \fun{hashPP}~{tx}
       \\~\\
       {
         {\begin{array}{c}
