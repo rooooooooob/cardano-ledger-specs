@@ -690,8 +690,6 @@ from the original Shelley spec):
     { \fun{txlst}~tx \leq \var{slot}
       & \fun{txttl}~tx \geq \var{slot}
       \\
-      ~
-      \\
       \txins{tx} \neq \emptyset
       & \txins{tx} \subseteq \dom \var{utxo}
       \\~\\
@@ -704,9 +702,9 @@ from the original Shelley spec):
       ~
       \\
       \fun{dom}(\fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})) = \mathsf{adaID} \\
-      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) \geq \\
+      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) \geq 
       \fun{toValue} ( \txfee{tx}
-      + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) )
+      + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) ) \\
       \minfee{pp}{tx} \leq \txfee{tx}
       \\
       ~
