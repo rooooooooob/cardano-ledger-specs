@@ -284,14 +284,7 @@ fees required.
     & ~~\var{r} \in \fun{findrdmr}~{(txid,ix)}~{tx}, \\
     & ~~\var{(txid,ix)} \mapsto ((a,v),h_d) \in \var{utxo}, \\
     & ~~\var{h_d} \mapsto \var{dataval} \in \fun{txdats}~{tx}, \\
-    & ~~(\fun{validatorHash}~{a})\mapsto \var{script_v}\in \fun{txvlds}~{tx} \}\\
-    & ~~\cup~ \\
-    & ~~\{ (\var{script_v},\fun{validationData}~\var{utxo}~\var{tx}~
-      (txid,ix); \Nothing; r; \epsilon) ~\vert \\
-    & ~~(txid,ix) \in \fun{txinputs}~\var{tx}, \\
-    & ~~ \wcard \mapsto (a,v) \in \var{(txid,ix)}\restrictdom\var{utxo}, \\
-    & ~~\wcard\mapsto \var{script_v}\in
-     \fun{validatorHash}~\var{a}\restrictdom\fun{txvlds}~{tx}\}
+    & ~~(\fun{validatorHash}~{a})\mapsto \var{script_v}\in \fun{txvlds}~{tx} \}
   \end{align*}
   \caption{Scripts and their Arguments}
   \label{fig:functions:script3}
@@ -683,6 +676,8 @@ from the original Shelley spec):
 
   \item the hash indexes of all $\Data$ values in the metadata are their correct hashes
 
+  \item there are no unnecessary/unused validators attached to the transaction
+
   \item the UTXOS state transition is valid, with the signal ($\var{sLst}$) being
   the full list of all scripts that need validating in the transaction, paired with
   their corresponding input data
@@ -756,17 +751,17 @@ from the original Shelley spec):
       \\
       ~
       \\
-      \forall~\var{hashscr_v}\mapsto\var{script_v}\in\fun{txvlds}~{tx},
+      \forall~\var{hashscr_v}\mapsto\var{script_v}\in\fun{txvlds}~{tx},~
       \var{hashscr_v} = \fun{hashScript}~\var{script_v}
       \\
       ~
       \\
-      \forall~\var{\_}\mapsto\var{hash_r}\in\fun{rdmrs}~{tx},
+      \forall~\var{\_}\mapsto\var{hash_r}\in\fun{rdmrs}~{tx},~
       \var{hash_r} \in \fun{dom}  \fun{txdats}~\var{tx}
       \\
       ~
       \\
-      \forall~\var{hash_d}\mapsto\var{dat}\in\fun{txdats}~{tx},
+      \forall~\var{hash_d}\mapsto\var{dat}\in\fun{txdats}~{tx},~
       \var{hash_d} = \fun{hashData}~\var{dat}
       \\
       ~
@@ -775,6 +770,7 @@ from the original Shelley spec):
       \\
       ~
       \\
+      \forall~h\mapsto v\in\fun{txvlds}~{tx},~\var{(v,\wcard)} \in \var{sLst} \\
       {
         \begin{array}{c}
           \var{slot}\\
