@@ -97,14 +97,15 @@ Additional fees may be required because of the changes in prices or the cost mod
 for script interpreter versions of the scripts inside the transaction.
 
 \begin{figure*}[htb]
-  \emph{Abstract Functions and Values}
+  \emph{Helper Functions}
   %
   \begin{align*}
-    \fun{versions} \in& \Vlds \to \powerset{(\PlutusVer)} \\
-    \fun{versions} \\
-    \text{Ada currency ID} \\
+    \fun{versions} ~\in~& \Vlds \to \powerset{(\PlutusVer)} \\
+    \fun{versions}~ \var{vlds} ~=~ & \{ \var{vn} ~\vert~
+      \var{(script,vn)~\in~ \fun{range}~{vlds}} \}\\
+    \text{Get all Plutus versions used in scripts} \\
   \end{align*}
-  \caption{Script Validation}
+  \caption{Plutus Versions}
   \label{fig:defs:functions-chain-helper}
 \end{figure*}
 
