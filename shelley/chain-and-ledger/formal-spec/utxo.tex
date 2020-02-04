@@ -678,6 +678,12 @@ from the original Shelley spec):
 
   \item there are no unnecessary/unused validators attached to the transaction
 
+  \item each validator version in the transaction has an associated cost model
+
+  \item
+  the hash of the subset of protocol parameters in the transaction body is equal to
+  the hash of the same subset of protocol parameters currently on the ledger
+
   \item the UTXOS state transition is valid, with the signal ($\var{sLst}$) being
   the full list of all scripts that need validating in the transaction, paired with
   their corresponding input data
@@ -692,9 +698,9 @@ from the original Shelley spec):
       \\
       \txins{tx} \neq \emptyset
       & \txins{tx} \subseteq \dom \var{utxo}
-      \\~\\
+      \\
       \fun{range}~(\{ (txid,ix) \vert (txid,ix,\Yes) \in \txins{tx} \} \restrictdom \var{utxo})
-      \subseteq \TxOutVK \\~\\
+      \subseteq \TxOutVK \\
       \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{slot}~{pp}~{stpools}~{tx}
       \\~\\
       \mathsf{adaID}\restrictdom \fun{forged}~{tx} = \epsilon
@@ -702,7 +708,7 @@ from the original Shelley spec):
       ~
       \\
       \fun{dom}(\fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})) = \mathsf{adaID} \\
-      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) \geq 
+      \fun{ubalance}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo}) \geq
       \fun{toValue} ( \txfee{tx}
       + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{tx}) ) \\
       \minfee{pp}{tx} \leq \txfee{tx}
@@ -764,6 +770,9 @@ from the original Shelley spec):
       \\
       ~
       \\
+      \fun{versions}~(\fun{txvlds}~\var{tx}) \subseteq \fun{dom}~(\fun{costmdls}~{tx}) \\
+      \fun{hashPlutusPP}~\var{pp}~(\fun{versions}~(\fun{txvlds}~\var{tx})) =  \fun{hashPP}~{tx}
+      \\~\\
       \var{sLst} := \fun{mkScrLst}~\var{tx}~\var{utxo}
       \\
       ~

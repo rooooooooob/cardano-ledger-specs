@@ -25,12 +25,7 @@ except for the following changes and additions:
 
   \item $\ScriptPlutus$ is a pair of the actual Plutus script and the version of the
   interpreter using which it was made. Recall that the version number is
-  used to call the interpreter specific to that version
-
-  As a script type, the Plutus script is a pair of the
-  actual script and the version of the Plutus interpreter which was used to
-  make this script. Both of these pieces of data need to be passed to the
-  interpreter during script validation.
+  used to call the interpreter specific to that version.
 
   \item $\Script$ is a sum type for all types of scripts
 
@@ -214,7 +209,7 @@ the body of the transaction:
 \textbf{Additional Role of Signatures on TxBody.}
 Note that the transaction body must contain every bit of data
 (or at least the hash of the data) that can influence the
-of on-chain transfer of value resulting from this transaction being processed
+on-chain transfer of value resulting from this transaction being processed
 (see Figure \ref{fig:defs:utxo-shelley-2}).
 In the classic UTxO case, this means that, for example,
 every input being spent and every output being created are in the body.
@@ -224,9 +219,9 @@ the validation outcome of a transaction between "fully validated", and "only
 paying fees" (two distinct cases of value transfer, which
 we will explain in Section~\ref{sec:utxo}).
 
-In both cases, the body of the transaction is necessarily signed. The signatures
+The signatures on transactions in both the extended and basic UTxO models
 are outside the body of the transaction.
-In both the basic and extended UTxO model, it is signed by every key
+In both the basic and extended UTxO model, the body is signed by every key
 whose outputs are being spent. In the extended case, this additionally offers
 protection from tampering with Plutus interpreter arguments, which may cause
 script validation failure (thus putting the transaction in the "only paying fees" case).
@@ -251,7 +246,11 @@ added by the creator of the block, or it is other kinds of metadata. It includes
 the following:
 
 \begin{itemize}
-  \item a finite map $\Vlds$ containing hash-indexed Plutus validator scripts
+  \item a finite map $\Vlds$ containing hash-indexed Plutus validator scripts.
+  Note that when hashing a Plutus script, both the content and the script get
+  hashed. This way, having the hash inside the signed body of the transaction
+  prevents not only the script, but the its version from being modified
+  after a transaction is submitted.
   \item $\DataHash \mapsto \Data$ is a similar structure for $\Data$.
   This is where data-values and redeemers are stored.
   The full data-values for the outputs a transaction is creating
@@ -271,7 +270,8 @@ the following:
   Its correctness is verified as part of the ledger rules, and the block is
   deemed invalid if this tag is applied incorrectly.
   It can later be used to re-apply blocks without performing script validation
-  again.
+  again. This tag does not need to be signed, since incorrect use will result
+  in the whole block being invalid, which benefits no one.
 \end{itemize}
 
 Note also that we have changed the type $\TxWitness$ to have
@@ -330,6 +330,47 @@ accessor functions.
   \label{fig:defs:utxo-shelley-2}
 \end{figure*}
 
+To select the right subset of ledger protocol parameters to hash, we need to
+first make a set of all the interpreter versions of all the scripts the
+transaction is carrying. This is done by the function $\fun{versions}$,
+see Figure \ref{fig:defs:functions-chain-helper}. Then, the parameters
+relevant to all those versions are selected and hashed by $\fun{hashPlutusPP}$.
+
+Note that at this time, only data from the protocol parameters must be hashed
+for the comparison we defined. For future Plutus versions, parts of the ledger
+state may need to be included in this hash as well, if they are passed as
+arguments to the new interpreter versions. Note also that data from the UTxO
+is passed to the interpreter, but does not require this type of hash comparison.
+This is because if the entries the transaction being processed is trying to
+spend have already been spent, there is a phase 1 validation check that
+will fail.
+
+\textbf{Parameter Hash Comparison Considerations.}
+In the future, additional functionality may be supported by the ledger that
+allows a sequence of transactions built over a period of time to be put on-chain
+as a single transaction. Over this period of time, the parameter or ledger
+data that must be passed as an argument to script interpreters could have changed.
+The resulting transaction to be put on the chain (that contains the whole sequence of
+transactions) is still obligated to include the hash of the current parameters
+and any additional script processing fees.
+
+Additional fees may be required because of the changes in prices or the cost model
+for script interpreter versions of the scripts inside the transaction.
+
+\begin{figure*}[htb]
+  \emph{Helper Functions}
+  %
+  \begin{align*}
+    \fun{versions} ~\in~& \Vlds \to \powerset{(\PlutusVer)} \\
+    \fun{versions}~ \var{vlds} ~=~ & \{ \var{vn} ~\vert~
+      \var{(script,vn)~\in~ \fun{range}~{vlds}} \}\\
+    \text{Get all Plutus versions used in scripts} \\
+  \end{align*}
+  \caption{Plutus Versions}
+  \label{fig:defs:functions-chain-helper}
+\end{figure*}
+
+\textbf{The Use of Coin vs Value Tokens}
 In Figure \ref{fig:defs:functions-helper} are the following helper functions,
 
 \begin{itemize}
@@ -352,12 +393,11 @@ In Figure \ref{fig:defs:functions-helper} are the following helper functions,
   of it
 \end{itemize}
 
-\textbf{The Use of Coin vs Value Tokens}
 The $\Coin$ type is used to represent an amount of Ada (e.g., the transaction
 fee field still has the type $\Coin$). It is made up of a single
 integer value. An amount of Ada can also be represented as a multicurrency value
 using the notation in Figure \ref{fig:defs:functions-helper}, as
-$\fun{toValue} c$ where $c \in \Coin$.
+$\fun{toValue}~c$ where $c \in \Coin$.
 
 The reason for retaining the specialized $\Coin$ type is the certain variables
 in the ledger state may only be considered as amounts of Ada, and this can
@@ -403,6 +443,7 @@ ledger values will always be Ada-specific, so there is no reason to use $\Quanti
   \label{fig:defs:functions-helper}
 \end{figure*}
 
+\textbf{Plutus Script Validation}
 In Figure \ref{fig:defs:functions-valid}, abstract functions for script validation
 are presented.
 
