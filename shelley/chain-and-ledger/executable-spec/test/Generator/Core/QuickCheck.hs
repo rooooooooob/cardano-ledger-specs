@@ -43,11 +43,13 @@ module Generator.Core.QuickCheck
   , unitIntervalToNatural
   , mkBlock
   , mkOCert
-  , getKESPeriodRenewalNo)
+  , getKESPeriodRenewalNo
+  , tooLateInEpoch)
   where
 
 import           Cardano.Crypto.VRF (deriveVerKeyVRF, genKeyVRF)
 import           Control.Monad (replicateM)
+import           Control.Monad.Trans.Reader (asks)
 import           Crypto.Random (drgNewTest, withDRG)
 import           Data.Coerce (coerce)
 import qualified Data.List as List (findIndex, (\\))
@@ -63,7 +65,7 @@ import           Test.QuickCheck (Gen)
 import qualified Test.QuickCheck as QC
 
 import           Address (scriptsToAddr, toAddr, toCred)
-import           BaseTypes (Nonce (..), UnitInterval, intervalValue)
+import           BaseTypes (Nonce (..), UnitInterval, epochInfo, intervalValue, slotsPrior)
 import           BlockChain (pattern BHBody, pattern BHeader, pattern Block, ProtVer (..),
                      TxSeq (..), bBodySize, bbHash, mkSeed, seedEta, seedL)
 import           Coin (Coin (..))
@@ -78,7 +80,7 @@ import           Keys (pattern KeyPair, hashAnyKey, hashKey, sKey, sign, signKES
 import           LedgerState (AccountState (..), genesisCoins)
 import           Numeric.Natural (Natural)
 import           OCert (KESPeriod (..), pattern OCert)
-import           Slot (BlockNo (..), SlotNo (..))
+import           Slot (BlockNo (..), Duration (..), SlotNo (..), epochInfoFirst, (*-))
 import           Test.Utils (evolveKESUntil, maxKESIterations, mkCertifiedVRF, mkGenKey,
                      mkKESKeyPair, mkKeyPair, mkVRFKeyPair, slotsPerKESIteration,
                      unsafeMkUnitInterval)
@@ -86,6 +88,8 @@ import           Tx (pattern TxOut, hashScript)
 import           TxData (pattern AddrBase, pattern AddrPtr, pattern KeyHashObj,
                      pattern RequireAllOf, pattern RequireAnyOf, pattern RequireMOf,
                      pattern RequireSignature, pattern ScriptHashObj)
+
+import           Test.Utils (epochFromSlotNo, runShelleyBase)
 
 genBool :: Gen Bool
 genBool = QC.arbitraryBoundedRandom
@@ -432,3 +436,13 @@ getKESPeriodRenewalNo keys (KESPeriod kp) =
           if p <= k && k < p + fromIntegral maxKESIterations
           then n
           else go rest (n + 1) k
+
+-- | True if the given slot is within the last `slotsPrior`
+-- slots of the current epoch.
+tooLateInEpoch :: SlotNo -> Bool
+tooLateInEpoch s = runShelleyBase $ do
+  ei <- asks epochInfo
+  firstSlotNo <- epochInfoFirst ei (epochFromSlotNo s + 1)
+  slotsPrior_ <- asks slotsPrior
+
+  return (s >= firstSlotNo *- Duration slotsPrior_)
