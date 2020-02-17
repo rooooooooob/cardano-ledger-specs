@@ -110,3 +110,73 @@ block (stored as a protocol parameter).
   \caption{BBody rules}
   \label{fig:rules:bbody}
 \end{figure}
+
+We have also defined a function that transforms the Shelley ledger state into
+the Goguen one, see Figure~\ref{fig:functions:to-shelley}. Note that here we
+refer to Shelley-era protocol parameter type as $\ShelleyPParams$, and the Goguen
+type as $\PParams$.
+
+\begin{note}
+  I think it makes sense to have Value have two constructors, Value and Coin.
+\end{note}
+
+%%
+%% Figure - Shelley to Goguen Transition
+%%
+\begin{figure}[htb]
+  \emph{Types and Constants}
+  %
+  \begin{align*}
+      & \NewParams ~=~ (\Language \mapsto \CostMod) \times \Prices \times \ExUnits \times \ExUnits \\
+      & \text{the type of new parameters to add for Goguen}
+      \nextdef
+      & \mathsf{IVs} ~\in~ \NewParams \\
+      & \text{the initial values for new Goguen parameters}
+  \end{align*}
+  \emph{Shelley to Goguen Transition Functions}
+  %
+  \begin{align*}
+      & \fun{mkUTxO} ~\in~ \Slot \to \UTxO  \to \UTxO  \\
+      & \fun{mkUTxO}~s~\var{utxo} ~=~ \{~ \var{txin} \mapsto ((a,\fun{toValue}~c),s) ~\vert~
+      \var{txin} \mapsto \var{(a,c)}~\} \\
+      & \text{make UTxO Goguen}
+      \nextdef
+      & \fun{toGoguen} \in ~ \ChainState \to \GoguenChainState \\
+      & \fun{toGoguen}~((v_1, v_2, v_3, (v_4, v_5, (\var{utxo}, v_6), \var{pp}),
+      v_7, v_8, v_8, v_{10}), v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
+      & ~~ = ((v_1, v_2, v_3, (v_4, v_5, (\fun{mkUTxO}~s_{last}~\var{utxo}, v_6),
+       \var{pp}\cup \mathsf{IVs}),
+      v_7, v_8, v_8, v_{10}), v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
+      & \text{transform Shelley chain state to Goguen state}
+  \end{align*}
+  \caption{Shelley to Goguen State Transtition}
+  \label{fig:functions:to-shelley}
+\end{figure}
+
+Block creaters should be able to apply the transformation in Figure
+\ref{fig:functions:to-shelley} to make any Shelley-era transactions
+processable in the Goguen era.
+
+\begin{figure}[htb]
+  \emph{Functions}
+  \begin{align*}
+      & \fun{mkIns} ~\in~ \powerset{\TxInShelley} \to \powerset{\TxInTx}  \\
+      & \fun{mkIns}~\var{ins} ~=~ \{~ (\var{txin}, \Nope) ~\vert~
+      \var{txin} \in \var{ins}~\} \\
+      & \text{transform Shelley inputs into Goguen inputs}
+      \nextdef
+      & \fun{mkOuts} ~\in~ (\Ix \mapsto \TxOutShelley) \to (\Ix \mapsto \TxOut) \\
+      & \fun{mkOuts}~\var{outs} ~=~ \{~ \var{ix} \mapsto \var{(a,\fun{toValue}~c)} ~\vert~
+      \var{ix} \mapsto \var{(a,c)} \in \var{outs}~\} \\
+      & \text{transform Shelley inputs into Goguen inputs}
+      \nextdef
+      & \fun{toGoguenTx} ~\in~ \Slot \to  \ShelleyTx \to \Tx \\
+      & \fun{toGoguenTx}~s_{last}~((\var{ins}, \var{outs},
+      v_3, v_4, v_5, v_6, v_7), \wcard) ~=~\\
+      &~~((\fun{mkIns}~\var{ins}, \fun{mkOuts}~\var{outs}, v_3, \epsilon,
+      (0, 0), v_4, (v_5, s_{last}), v_6, v_7, \Nothing, \Nothing), \wcard) \\
+      & \text{transform a Shelley transaction into a Goguen transaction}
+  \end{align*}
+  \caption{Shelley to Goguen Transaction Interpretation}
+  \label{fig:functions:to-shelley}
+\end{figure}

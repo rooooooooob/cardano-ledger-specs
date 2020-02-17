@@ -61,6 +61,7 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\R}{\ensuremath{\mathbb{R}}}
 \newcommand{\Rnn}{\ensuremath{\mathbb{R}^{\geq 0}}}
 \newcommand{\Tx}{\type{Tx}}
+\newcommand{\ShelleyTx}{\type{ShelleyTx}}
 \newcommand{\TxBody}{\type{TxBody}}
 \newcommand{\UnsignedData}{\type{UnsignedData}}
 \newcommand{\VldSR}{\type{VldSR}}
@@ -68,12 +69,15 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\Vlds}{\type{Vlds}}
 \newcommand{\TxWitness}{\type{TxWitness}}
 \newcommand{\Ix}{\type{Ix}}
+\newcommand{\TypeIx}{\type{TypeIx}}
 \newcommand{\TxId}{\type{TxId}}
 \newcommand{\Addr}{\type{Addr}}
 \newcommand{\UTxO}{\type{UTxO}}
 \newcommand{\Wdrl}{\type{Wdrl}}
 \newcommand{\Coin}{\type{Coin}}
 \newcommand{\PParams}{\type{PParams}}
+\newcommand{\ShelleyPParams}{\type{ShelleyPParams}}
+\newcommand{\NewParams}{\type{NewParams}}
 \newcommand{\Slot}{\type{Slot}}
 \newcommand{\SlotsPrior}{\ensuremath{\mathsf{SlotsPrior}}}
 \newcommand{\SlotsPerEpoch}{\mathsf{SlotsPerEpoch}}
@@ -87,7 +91,7 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\Ppm}{\type{Ppm}}
 \newcommand{\Value}{\type{Value}}
 \newcommand{\ProtVer}{\ensuremath{\type{ProtVer}}}
-\newcommand{\PlutusVer}{\type{PlutusVer}}
+\newcommand{\Language}{\type{Language}}
 \newcommand{\ApName}{\ensuremath{\type{ApName}}}
 \newcommand{\ApVer}{\ensuremath{\type{ApVer}}}
 \newcommand{\SystemTag}{\ensuremath{\type{SystemTag}}}
@@ -135,6 +139,7 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 % multi-signature
 \newcommand{\StakeCredential}{\type{Credential}_{stake}}
 \newcommand{\StakeDelegs}{\type{StakeDelegs}}
+\newcommand{\Quorum}{\type{Quorum}}
 
 \newcommand{\txwitsVKey}[1]{\fun{txwitsVKey}~\var{#1}}
 \newcommand{\txwitsScript}[1]{\fun{txwitsScript}~\var{#1}}
@@ -151,10 +156,9 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\AddrScrEnterprise}{\type{Addr_{enterprise}^{script}}}
 \newcommand{\AddrScrPtr}{\type{Addr_{ptr}^{script}}}
 \newcommand{\ScriptHash}{\type{ScriptHash}}
-\newcommand{\ScriptHashPlutus}{\type{ScriptHashPlutus}}
-\newcommand{\ScriptHashMSig}{\type{ScriptHashMSig}}
 \newcommand{\DataHash}{\type{DataHash}}
 \newcommand{\HashPP}{\type{HashPP}}
+\newcommand{\HashDVs}{\type{HashDVs}}
 \newcommand{\Script}{\type{Script}}
 \newcommand{\ScriptPlutus}{\type{Script}_{plc}}
 \newcommand{\ScrPLC}{\type{ScrPLC}}
@@ -167,6 +171,7 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\DorR}{\type{DorR}}
 \newcommand{\ValidationData}{\type{ValidationData}}
 \newcommand{\IsValidating}{\type{IsValidating}}
+\newcommand{\HashUnsData}{\type{HashUnsData}}
 \newcommand{\Yes}{\type{Yes}}
 \newcommand{\Nope}{\type{Nope}}
 \newcommand{\MSig}{\type{MSig}}
@@ -180,6 +185,9 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 %% Adding witnesses
 \newcommand{\TxIn}{\type{TxIn}}
 \newcommand{\TxInTx}{\type{TxInTx}}
+\newcommand{\TxInShelley}{\type{TxInShelley}}
+\newcommand{\TxOutShelley}{\type{TxOutShelley}}
+\newcommand{\HasDV}{\type{HasDV}}
 \newcommand{\TxInScr}{\type{TxInScr}}
 \newcommand{\Info}{\type{Info}}
 \newcommand{\ExUnits}{\type{ExUnits}}
@@ -187,8 +195,9 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\Prices}{\type{Prices}}
 \newcommand{\IsFee}{\type{IsFee}}
 \newcommand{\TxOut}{\type{TxOut}}
-\newcommand{\TxOutVK}{\type{TxOutVK}}
-\newcommand{\TxOutScr}{\type{TxOutScr}}
+\newcommand{\TxOutTx}{\type{TxOutTx}}
+\newcommand{\TxOutND}{\type{TxOutND}}
+\newcommand{\TxOutP}{\type{TxOutP}}
 \newcommand{\VKey}{\type{VKey}}
 \newcommand{\VKeyEv}{\type{VKey_{ev}}}
 \newcommand{\VKeyGen}{\type{VKey_G}}
@@ -219,7 +228,7 @@ Integration}{Formal Cardano Ledger with Plutus Spec.}
 \newcommand{\BDState}{\type{BDState}}
 \newcommand{\LEnv}{\type{LEnv}}
 \newcommand{\LState}{\type{LState}}
-
+\newcommand{\GoguenChainState}{\type{GoguenChainState}}
 %%
 %% Functions
 %%

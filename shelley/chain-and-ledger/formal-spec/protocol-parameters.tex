@@ -5,7 +5,8 @@ For Plutus integration, we have added the following types
 (see Figure~\ref{fig:defs:protocol-parameters}):
 
 \begin{itemize}
-\item $\PlutusVer$: This represents the version number of the Plutus interpreter
+\item $\Language$: This represents the language name/tag (including the Plutus
+version number)
 \item $\ExUnits$: A term of this type has two integer values, $(mem, steps)$. The first
 represents some notion of the amount of memory needed for script validation.
 The second, the number of reduction steps (for some definition of a step, specific
@@ -44,11 +45,13 @@ is actually paying. The $\Prices, \ExUnits$ or $\CostMod$ types are not used
 in processing native scripts.
 
 \textbf{Plutus Versions.} Each
-version of Plutus (identified by a $\PlutusVer$ value) is considered a different
+version of Plutus (identified by a $\Language$ value) is considered a different
 language. That is, the interpreter
 specific to that version is invoked when a script is run. Each language
 has a (version-specific) set of arguments passed to the interpreter for
-for script evaluation.
+for script evaluation. When Goguen is released, this type should contain
+terms that are tags for the multisignature script language, and $\var{plcV1Tag}$,
+for the first version of Plutus being released.
 
 The ledger is expected to be capable of running Plutus scripts of
 all existing versions at all times. This means maintaining any ledger
@@ -130,7 +133,7 @@ types of scripts. Recall here that these only have non-trivial values for
   \emph{Derived types}
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
-      \var{plv} & \PlutusVer
+      \var{plv} & \Language
       & \N \times \N \times \N
       & \text{Plutus interpreter version}
       \\
@@ -150,7 +153,7 @@ types of scripts. Recall here that these only have non-trivial values for
   %
   \begin{equation*}
       \begin{array}{r@{~\in~}lr}
-        \var{costmdls} \mapsto (\PlutusVer \mapsto \CostMod) & \PParams & \text{script exec cost model}\\
+        \var{costmdls} \mapsto (\Language \mapsto \CostMod) & \PParams & \text{script exec cost model}\\
         \var{prices} \mapsto \Prices & \PParams & \text{coefficients for ExUnits prices} \\
         \var{maxTxExUnits} \mapsto \ExUnits & \PParams & \text{max total tx script execution resources}\\
         \var{maxBlockExUnits} \mapsto \ExUnits & \PParams & \text{max total block script execution resources}\\
@@ -166,8 +169,12 @@ types of scripts. Recall here that these only have non-trivial values for
   \emph{Selector Functions}
   %
   \begin{align*}
-    & \fun{hashPlutusPP} \in \PParams \to \powerset{(\PlutusVer)} \to \HashPP   \\
-    & \fun{hashPlutusPP}~\var{pp}~\var{pv} = \fun{hash} (\fun{toList} (\var{pv} \restrictdom \fun{costmdls}~{pp})) \\
+    & \fun{hashPlutusPP} \in \PParams \to \powerset{(\Language)} \to \HashPP^?   \\
+    & \fun{hashPlutusPP}~\var{pp}~\var{pv} = \begin{cases}
+         \fun{hash}~(\var{pv} \restrictdom \fun{costmdls}~{pp}) 
+                           & \text{if~} \var{pv} \restrictdom \fun{costmdls}~{pp} \neq \{\} \\
+              \Nothing & \text{otherwise} \\
+      \end{cases} \\
     & \text{this calculation hashes the current protocol parameters relevant to
     the given set of versions}
   \end{align*}

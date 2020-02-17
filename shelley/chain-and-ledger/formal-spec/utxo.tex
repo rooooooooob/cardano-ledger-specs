@@ -27,12 +27,20 @@ for paying transaction fees
     \fun{txinputs} ~tx,~
      \var{isfee}\in\Yes\}
     \nextdef
+    & \fun{getOut} \in \TxOutTx \to \TxOut \\
+    & \text{tx outputs transformed to UTxO outputs} \\
+    & \fun{getOut} ~{txout}~= \begin{cases}
+         \var{txout}  & \text{if~} \var{txout} \in \TxOutND \\
+              (\fun{getAddr}~\var{txout}, \fun{getValue}~\var{txout},
+              \fun{getDataHash}~\var{txout}) & \text{otherwise}
+            \end{cases}
+    \nextdef
     & \fun{outs} \in \Slot \to \Tx \to \UTxO
     & \text{tx outputs as UTxO} \\
     & \fun{outs} ~ \var{slot}~\var{tx} =
         \left\{
-          (\fun{txid} ~ \var{tx}, \var{ix}) \mapsto (\var{txout},\var{slot}) ~
-          \middle|
+          (\fun{txid} ~ \var{tx}, \var{ix}) \mapsto (\fun{getOut}~\var{txout},\var{slot}) ~
+          \middle|~
           \var{ix} \mapsto \var{txout} \in \txouts{tx}
         \right\} \\
     \nextdef
@@ -82,7 +90,7 @@ The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Value$.
   \emph{Abstract Functions}
   \begin{align*}
     & \fun{txscrfee} \in \Prices \to \ExUnits \to \Coin \\
-    & \fun{txscrfee} (\var{pr_{init}, pr_{mem}, pr_{steps}}) (\var{mem, steps})
+    & \fun{txscrfee}~ (\var{pr_{init}, pr_{mem}, pr_{steps}})~ (\var{mem, steps})
     = \var{pr_{init}} + \var{pr_{mem}}*\var{mem} + \var{pr_{steps}}*\var{steps} \\
     & \text{calculates the script fee a transaction must pay} \\
   \end{align*}
@@ -107,7 +115,7 @@ The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Value$.
     & \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \\
     & ~~\ubalance{(\txins{tx} \restrictdom \var{utxo})} +
         \fun{toValue} (\fun{wbalance}~(\fun{txwdrls}~{tx})~+~ \keyRefunds{pp}{stdelegs}{tx}) +
-        ~\fun{forged}~\var{tx} \\
+        ~\fun{forge}~\var{tx} \\
     & \text{value consumed} \\
     \nextdef
     & \fun{produced} \in \Slot \to \PParams \to \StakePools \to \Tx \to \Value \\
@@ -125,12 +133,12 @@ The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Value$.
 
 \textbf{Putting Together Plutus Scripts and Their Inputs.}
 In the following Figure \ref{fig:functions:script1} we give the functions
-related to sequential Plutus script validation. The functions
-defined in this figure apply specifically to Plutus scripts, and gather
-only the Plutus validator scripts and their inputs. The reason for
-this separation from native scripts is the difference in type signatures.
-The map $\fun{findrdmr}$ returns the
-redeemer corresponding to the current item being validated, which, recall, can
+related to sequential Plutus script validation.
+
+
+
+The map $\fun{finddata}$ returns the
+data corresponding to the current item being validated, which, recall, can
 be
 
 \begin{itemize}
@@ -139,20 +147,19 @@ be
   as this is the only certificate type that allows script witnesses)
   \item the reward withdrawal $a \to c \in \Wdrl$
   \item the output reference $\TxIn$ for spending the corresponding output
+  (for both the redeemer and the data value)
 \end{itemize}
 
-If there is no redeemer for the given item, the function returns $\Nothing$.
+If there is no redeemer for the given item, the function returns $\Nothing_d$.
 The reason for this is that every Plutus script must have all three arguments
-of type $\Data$, of which $\Nothing$ is a term.
+of type $\Data$, of which $\Nothing_d$ is a term.
 
-\textbf{Redeemer without DataValue.} Note that of the four items, only an
+\textbf{Optional Redeemers.} Note that of the four items, only an
 output-locking script can have a data-value. In other cases, there is no
-notion of separately stored "state", and hence no data-value.
+notion of ledger-recorded "state", and hence no data-value.
 The may have redeemers, however.
 Allowing scripts to have redeemers could allow users to reduce the script
-execution costs by avoiding unnecessary computation. Note that since the
-redeemer look-up by current item ($\fun{rdmrs}~{tx}$) is inside the body,
-we trust this finite map to contain the necessary and correct redeemer hashes.
+execution costs by avoiding unnecessary computation.
 
 \textbf{Matching Scripts and Inputs.}
 The function $\fun{mkPLCLst}$ returns a list of pairs of a validator script and
@@ -162,19 +169,38 @@ its inputs. In particular, it returns a validator script together with
  directly during the application of the validation rule UTXOS.
 
 \begin{figure}[htb]
+  %
+  \emph{Abstract functions}
   \begin{align*}
-    &\fun{findrdmr} \in \CurItem \to \Tx \to \powerset{\Data} \\
-    & \text{get redeemer corresponding to current item} \\
-    &\fun{findrdmr}~{cur}~{tx} ~=~ \\
-    &~~  \begin{cases}
-        \{ \var{rdmr} ~\vert~
-       \var{cur} \mapsto \var{h_r} \in \fun{rdmrs}~\var{tx},
-       \var{h_r} \mapsto \var{rdmr}\in \fun{txdats}~\var{tx}\}
-                           & \text{if~} \var{cur} \in \fun{dom}~(\fun{rdmrs}~\var{tx}) \\
-              \{\Nothing\} & \text{otherwise} \\
-      \end{cases}
+    &\fun{indexof} \in \seqof{\DCert} \to \DCert \to \Ix\\
+    &\fun{indexof} \in \Wdrl \to \Wdrl \to \Ix\\
+    &\fun{indexof} \in \powerset{TxInTx} \to \TxInTx \to \Ix\\
+    &\fun{indexof} \in \Value \to \Value \to \Ix\\
+    & \text{get the index of an item in the an ordered representation} \\
+  \end{align*}
+  %
+  \emph{Helper functions}
+  \begin{align*}
+    &\fun{indexedScripts} \in \Tx \to (\ScriptHash \mapsto \Script) \\
+    & \text{make a finite map of hash-indexed scripts} \\
+    &\fun{indexedScripts}~{tx} ~=~ \{ h \mapsto s ~\vert~ \fun{hashScript}~{s}~=~h, s\in~\fun{txscripts}~\var{tx}\}
     \nextdef
-    & \fun{mkPLCLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptV,\seqof{\Data})} \\
+    &\fun{indexedDats} \in \Tx \to (\DataHash \mapsto \Data)\\
+    & \text{make a finite map of hash-indexed data values} \\
+    &\fun{indexedDats}~{tx} ~=~ \{ h \mapsto d ~\vert~ \fun{hashData}~{d}~=~h, d\in~\fun{txdats}~\var{tx}\}
+    \nextdef
+    &\fun{findRdmr} \in \Tx \to \CurItem \to \powerset{\Data}\\
+    & \text{get redeemer corresponding to index} \\
+    & \fun{findRdmr}~{tx}~\var{it} ~=~ \{ r ~\vert~ \\
+    &~~(\mathsf{certTag}, \fun{indexof}~(\fun{txcerts}~{tx})~\var{it}) \mapsto ~r \in \fun{txrdmrs}~{tx} \\
+    &~~\vee~ (\mathsf{wdrlTag}, \fun{indexof}~(\fun{txwdrls}~{tx})~\var{it})
+      \mapsto ~r \in \fun{txrdmrs}~{tx} \\
+    &~~\vee~(\mathsf{forgeTag}, \fun{indexof}~(\fun{forge}~{tx})~\var{it})  \mapsto ~r
+      \in \fun{txrdmrs}~{tx} \\
+    &~~\vee~(\mathsf{inputTag}, \fun{indexof}~(\fun{txinputs}~{tx})~\var{it}) \mapsto ~r
+      \in \fun{txrdmrs}~{tx} \}
+    \nextdef
+    & \fun{mkPLCLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptPlutus,\seqof{\Data})} \\
     & \text{a list of all Plutus validators and corresponding input data} \\
     & \fun{mkPLCLst}  ~\var{pp}~\var{tx}~ \var{utxo} ~=~
     \fun{toList}~(\fun{allCertScrts}~\var{pp}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~\var{pp}~{utxo}~{tx} \\
@@ -214,7 +240,7 @@ sets:
 the certificate witness, or the payment credential part of a UTxO address
 
 \item the corresponding
-full validator, which is looked up (by hash value) in the finite map $\fun{txvlds}$ in the
+full validator, which is looked up (by hash value) in the finite map $\fun{txscripts}$ in the
 body of the transaction, and must hash to the value by which it is indexed
 
 \item the data values and redeemers, which are also looked up by hash in $\fun{txdats}~{tx}$.
@@ -237,35 +263,37 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allCertScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV \times \seqof{\Data})} \\
+    & \fun{allCertScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus \times \seqof{\Data})} \\
     & \text{check that all certificate witnessing scripts in a tx validate} \\
     & \fun{allCertScrts}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v},
-    \fun{validationData}~\var{utxo}~\var{tx}~\var{cert}; \Nothing; r; \epsilon) ~\vert \\
-    & ~~r \in \fun{findrdmr}~{\fun{regCred}~\var{cert}}~{tx}, \\
+    \fun{validationData}~\var{utxo}~\var{tx}~\var{cert}; \Nothing_d; r; \epsilon) ~\vert \\
+    & ~~r \in \fun{findRdmr}~{tx}~\var{cert}, \\
     & ~~\var{cert} \in (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
-    &~~\fun{regCred}~\var{cert}\mapsto \var{script_v}\in \fun{txvlds}~{tx}
+    &~~\fun{regCred}~\var{cert}\mapsto \var{script_v}\in \fun{indexedScripts}~{tx}, \\
+    & ~~\var{script_v} \in \ScriptPlutus
      \} \\
     %
     \nextdef
-    & \fun{allWDRLSScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\seqof{\Data})} \\
+    & \fun{allWDRLSScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
     & \fun{allWDRLSScrts}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v},\fun{validationData}~\var{utxo}~\var{tx}~
-      (a\mapsto c); \Nothing; r; \epsilon) ~\vert \\
-    &~~ r\in \fun{findrdmr}~{(\fun{validatorHash}~\var{a})}~{tx}, \\
+      (a\mapsto c); \Nothing_d; r; \epsilon) ~\vert \\
+    &~~ r\in \fun{findRdmr}~{tx}~\var{(a\mapsto c)}, \\
     & ~~a \mapsto c \in\fun{txwdrls}~\var{tx}, \\
-    & ~~\fun{validatorHash}~\var{a}\mapsto \var{script_v}\in \fun{txvlds}~{tx}\}
+    & ~~\fun{validatorHash}~\var{a}\mapsto \var{script_v}\in \fun{indexedScripts}~{tx}, \\
+    & ~~ \var{script_v} \in \ScriptPlutus \}
     \nextdef
     %
-    & \fun{forgedScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\seqof{\Data})} \\
+    & \fun{forgedScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
     & \text{check that all forging scripts in a tx validate} \\
     & \fun{forgedScrts}~{utxo}~{tx}~=~\\
     & ~~\{ (\var{script_v},
-    \fun{validationData}~\var{utxo}~\var{tx}~\var{cid}; \Nothing; r; \epsilon) ~\vert \\
-    & ~~r \in \fun{findrdmr}~{cid}~{tx}, \\
-    & ~~\var{cid}\mapsto ~ \wcard \in \fun{forged}~\var{tx}, \\
-    &~~\wcard\mapsto \var{script_v}\in \var{cid}\restrictdom\fun{txvlds}~{tx}
+    \fun{validationData}~\var{utxo}~\var{tx}~\var{cid}; \Nothing_d; r; \epsilon) ~\vert \\
+    & ~~r \in \fun{findRdmr}~{tx}~(\var{cid}\mapsto ~ \var{tkns}), \\
+    & ~~\var{cid}\mapsto ~ \var{tkns} \in \fun{forge}~\var{tx}, \\
+    &~~\var{cid}\mapsto \var{script_v}\in \fun{indexedScripts}~{tx}
      \} \\
     %
   \end{align*}
@@ -275,16 +303,16 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allInsScrts} \in \PParams \to \UTxO \to \Tx \to \powerset{(\ScriptV\times\seqof{\Data})} \\
+    & \fun{allInsScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
-    & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}; (\var{dataval};\var{r}; \\
+    & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}; (\var{d};\var{r}; \\
     & ~~ \fun{validationData}~\var{utxo}~\var{tx}~
       (txid,ix,\var{hash_r}))) ~\vert \\
     & ~~(txid,ix) \in \fun{txinputs}~\var{tx}, \\
-    & ~~\var{r} \in \fun{findrdmr}~{(txid,ix)}~{tx}, \\
+    & ~~\var{r} \in \fun{findRdmr}~{tx}~\var{(txid,ix)}, \\
     & ~~\var{(txid,ix)} \mapsto ((a,v),h_d) \in \var{utxo}, \\
-    & ~~\var{h_d} \mapsto \var{dataval} \in \fun{txdats}~{tx}, \\
-    & ~~(\fun{validatorHash}~{a})\mapsto \var{script_v}\in \fun{txvlds}~{tx} \}
+    & ~~\var{h_d}\mapsto \var{d} \in \fun{indexedDats}~{tx}, \\
+    & ~~(\fun{validatorHash}~{a})\mapsto \var{script_v}\in \fun{indexedScripts}~{tx} \}
   \end{align*}
   \caption{Scripts and their Arguments}
   \label{fig:functions:script3}
@@ -354,7 +382,7 @@ script and the corresponding input data.
   \begin{equation*}
     \_ \vdash
     \var{\_} \trans{utxos}{\_} \var{\_}
-    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{(\ScriptV\times\seqof{\Data})} \times \ValState)
+    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{(\ScriptPlutus\times\seqof{\Data})} \times \ValState)
   \end{equation*}
   %
   \caption{UTxO script validation types}
@@ -653,12 +681,12 @@ from the original Shelley spec):
   allowed units
 
   \item If an input in the transaction is spending a Plutus script locked output,
-  the $\fun{txvlds}$ map contains the corresponding full validator, and the
+  the $\fun{txscripts}$ map contains the corresponding full validator, and the
   $\fun{txdats}$ map has a key which is the
   data-value hash for this output stored in the ledger UTxO entry
 
   \item A transaction output paying to a Plutus script must
-  contain the hash of the data-value (be of the $\TxOutScr$ type)
+  contain the hash of the data-value (be of the $\TxOutP$ type)
 
   \item for each reward withdrawal from a Plutus script address, the transaction
   has the full validator in the metadata
@@ -700,10 +728,10 @@ from the original Shelley spec):
       & \txins{tx} \subseteq \dom \var{utxo}
       \\
       \fun{range}~(\{ (txid,ix) \vert (txid,ix,\Yes) \in \txins{tx} \} \restrictdom \var{utxo})
-      \subseteq \TxOutVK \\
+      \subseteq \TxOutND \\
       \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{slot}~{pp}~{stpools}~{tx}
       \\~\\
-      \mathsf{adaID}\restrictdom \fun{forged}~{tx} = \epsilon
+      \mathsf{adaID}\restrictdom \fun{forge}~{tx} = \epsilon
       \\
       ~
       \\
@@ -715,7 +743,7 @@ from the original Shelley spec):
       \\
       ~
       \\
-      \forall txout \in \txouts{tx}, txout \geq 0 \\
+      \forall txout \in \txouts{tx}, \fun{getValue}~txout \geq \fun{makeZeros}~0 \\
       \forall \mathsf{adaID}\mapsto{tkns} \in \txouts{tx},
       \fun{dom}~\var{tkns} = \{\mathsf{adaToken}\}
       \\
@@ -728,56 +756,27 @@ from the original Shelley spec):
       ~
       \\
       \forall~\var{txin}\in\fun{txinputs}~{tx},
-      \var{txin} \mapsto \var{(a,\wcard,h_d)} \in \var{utxo}, \\
-      (\var{h_d} \in \fun{dom}(\fun{txdats}~{tx}) \wedge
-      \fun{validatorHash}~{a} \in \fun{dom}(\fun{txvlds}~{tx}))
+      \var{txin} \mapsto \var{(\wcard,\wcard,h_d)} \in \var{utxo},
+      \var{h_d} \in \fun{dom}(\fun{indexedDats}~{tx})
       \\
       ~
       \\
-      \forall~\var{txout}\in\fun{txouts}~{tx},
-      \fun{getAddr}~{txout} \in \AddrScr, \\
-      \fun{validatorHash}~(\fun{getAddr}~{txout}) \in \ScriptHashPlutus
-      \Rightarrow \var{txout}\in\TxOutScr
+      \forall~ix \mapsto (a,v,d_h,\var{hdv}) ~\in~\fun{txouts}~{tx}, \\
+      \var{hdv}~ = ~\Yes~ \Rightarrow \var{d_h}\restrictdom \fun{indexedDats}~{tx}~ \neq~\{\}
       \\
       ~
       \\
-      \forall~(a\mapsto c)\in\fun{txwdrls}~{tx},~{a}\in \AddrRWDScr, \fun{validatorHash}~{a} \in \ScriptHashPlutus \\
-      \Rightarrow \fun{validatorHash}~{a} \in \fun{dom}(\fun{txvlds}~{tx})
-      \\
-      ~
-      \\
-      \forall~\var{cert}\in\fun{txcerts}~{tx},~\fun{regCred}~{cert}\in \ScriptHashPlutus \Rightarrow \\
-      \fun{regCred}~{cert} \in \fun{dom}(\fun{txvlds}~{tx}) ~\wedge~ \var{cert} \in\DCertDeRegKey
-      \\
-      ~
-      \\
-      \forall~(cid\mapsto tkns)\in\fun{forged}~{tx},~\var{cid} \in \fun{dom}(\fun{txvlds}~{tx})
-      \\
-      ~
-      \\
-      \forall~\var{hashscr_v}\mapsto\var{script_v}\in\fun{txvlds}~{tx},~
-      \var{hashscr_v} = \fun{hashScript}~\var{script_v}
-      \\
-      ~
-      \\
-      \forall~\var{\_}\mapsto\var{hash_r}\in\fun{rdmrs}~{tx},~
-      \var{hash_r} \in \fun{dom}  \fun{txdats}~\var{tx}
-      \\
-      ~
-      \\
-      \forall~\var{hash_d}\mapsto\var{dat}\in\fun{txdats}~{tx},~
-      \var{hash_d} = \fun{hashData}~\var{dat}
-      \\
-      ~
-      \\
-      \fun{versions}~(\fun{txvlds}~\var{tx}) \subseteq \fun{dom}~(\fun{costmdls}~{tx}) \\
-      \fun{hashPlutusPP}~\var{pp}~(\fun{versions}~(\fun{txvlds}~\var{tx})) =  \fun{hashPP}~{tx}
+      \fun{plclangs}~(\fun{txscripts}~\var{tx}) \subseteq \fun{dom}~(\fun{costmdls}~{tx}) \\
+      \fun{plclangs}~(\fun{txscripts}~\var{tx}) ~=~ \{\} \Rightarrow \fun{hashPP}~{tx}~=~\Nothing \\ \fun{plclangs}~(\fun{txscripts}~\var{tx}) \neq \{\} \Rightarrow \\
+      \fun{hashPlutusPP}~\var{pp}~(\fun{plclangs}~(\fun{txscripts}~\var{tx})) =  \fun{hashPP}~{tx} \\
+      \fun{txdats}~\var{tx} ~=~ \{\} \Rightarrow \fun{hashDVs}~{tx}~=~\Nothing \\
+      \fun{txdats}~\var{tx} ~\neq~ \{\} \Rightarrow
+      \fun{hash}~(\fun{txdats}~\var{tx})~ =~  \fun{hashDVs}~{tx} \\
       \\~\\
-      \var{sLst} := \fun{mkScrLst}~\var{tx}~\var{utxo}
+      \var{sLst} := \fun{mkPLCLst}~\var{tx}~\var{utxo}
       \\
       ~
       \\
-      \forall~h\mapsto v\in\fun{txvlds}~{tx},~\var{(v,\wcard)} \in \var{sLst} \\
       {
         \begin{array}{c}
           \var{slot}\\
@@ -856,23 +855,93 @@ Native script validation
 still is, and we need to pick only the native scripts to validate as
 part of witnessing.
 
-We have replaced the $\fun{scriptsNeeded}$ function used in the UTXOW rule
-in the Shelley specification
-with a different fuction, $\fun{nativeScriptsNeeded}$, which selects only
-the native (multisignature) scipts as the set which must be validated, see Figure
+ see Figure
 \ref{fig:functions-witnesses}.
 
 
 \begin{figure}[htb]
   \begin{align*}
-    & \hspace{-1cm}\fun{nativeScriptsNeeded} \in \UTxO \to \Tx \to
-      \powerset{\ScriptHashMSig}
-    & \text{required script hashes} \\
-    &  \hspace{-1cm}\fun{nativeScriptsNeeded}~\var{utxo}~\var{tx} = \\
-    & ~~(\fun{scriptsNeeded}~\var{utxo}~\var{tx}) \cap \ScriptHashMSig
+      & \hspace{-1cm}\fun{scriptsNeeded} \in \UTxO \to \Tx \to
+        \powerset{\ScriptHash}
+      & \text{required script hashes} \\
+      &  \hspace{-1cm}\fun{scriptsNeeded}~\var{utxo}~\var{tx} = \\
+      & ~~\{ \fun{validatorHash}~(\fun{getAddr}~{txout}) \mid i \mapsto \var{txout} \in \var{utxo},\\
+      & ~~~~~i\in\fun{txinsScript}~{(\fun{txins~\var{tx}})}~{utxo}\} \\
+      \cup & ~~\{ \fun{stakeCred_{r}}~\var{a} \mid a \in \dom (\AddrRWDScr
+             \restrictdom \fun{txwdrls}~\var{tx}) \} \\
+        \cup & ~~(\AddrScr \cap \fun{certWitsNeeded}~{tx}) \\
+        \cup & ~~\fun{dom}~(\fun{forge}~{tx})
   \end{align*}
   \caption{Functions used in witness rule}
   \label{fig:functions-witnesses}
+\end{figure}
+
+Anything having to do with multisig scripts is checked in the UTXOW rule.
+
+\begin{figure}
+  \begin{equation}
+    \label{eq:utxo-witness-inductive-shelley}
+    \inference[UTxO-wit]
+    {
+      (utxo, \wcard, \wcard, \wcard) \leteq \var{utxoSt} \\
+      \var{witsKeyHashes} \leteq \{\fun{hashKey}~\var{vk} \vert \var{vk} \in
+      \dom (\txwitsVKey{tx}) \}\\~\\
+      \forall \var{validator} \in \fun{txscripts}~{tx} \cap \ScriptMSig,\\
+      \fun{valMSigupTo}~\var{validator}~\var{tx}\\~\\
+      \fun{scriptsNeeded}~\var{utxo}~\var{tx} ~=~ \dom (\fun{indexedScripts}~{tx})
+      \\~\\
+      \forall \var{cert}~\in~\fun{txcerts}~{tx}, \fun{regCred}~{cert}\in \ScriptHash \Rightarrow \\
+      \var{cert} \in~ \DCertDeRegKey
+      \\~\\
+      \forall \var{vk} \mapsto \sigma \in \txwitsVKey{tx},
+      \mathcal{V}_{\var{vk}}{\serialised{\txbody{tx}}}_{\sigma} \\
+      \fun{witsVKeyNeeded}~{utxo}~{tx}~{genDelegs} \subseteq \var{witsKeyHashes}
+      \\~\\
+      genSig \leteq
+      \left\{
+        \fun{hashKey}~gkey \vert gkey \in\dom{genDelegs}
+      \right\}
+      \cap
+      \var{witsKeyHashes}
+      \\
+      \left\{
+        c\in\txcerts{tx}~\cap\DCertMir
+      \right\} \neq\emptyset \implies \vert genSig\vert \geq \Quorum \wedge
+      \fun{d}~\var{pp} > 0
+      \\~\\
+      \var{mdh}\leteq\fun{txMDhash}~\var{tx}
+      &
+      \var{md}\leteq\fun{txMD}~\var{tx}
+      \\
+      (\var{mdh}=\Nothing \land \var{md}=\Nothing)
+      \lor
+      (\var{mdh}=\fun{hashMD}~\var{md})
+      \\~\\
+      {
+        \begin{array}{r}
+          \var{slot}\\
+          \var{pp}\\
+          \var{stkCreds}\\
+          \var{stpools}\\
+          \var{genDelegs}\\
+        \end{array}
+      }
+      \vdash \var{utxoSt} \trans{\hyperref[fig:rules:utxo-shelley]{utxo}}{tx}
+      \var{utxoSt'}\\
+    }
+    {
+      \begin{array}{r}
+        \var{slot}\\
+        \var{pp}\\
+        \var{stkCreds}\\
+        \var{stpools}\\
+        \var{genDelegs}\\
+      \end{array}
+      \vdash \var{utxoSt} \trans{utxow}{tx} \varUpdate{\var{utxoSt'}}
+    }
+  \end{equation}
+  \caption{UTxO with witnesses inference rules}
+  \label{fig:rules:utxow-shelley}
 \end{figure}
 
 \clearpage
