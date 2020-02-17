@@ -126,6 +126,9 @@ types of scripts. Recall here that these only have non-trivial values for
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
+      \var{plv} & \Language
+      & \text{Script Language}
+      \\
       \var{costm} & \CostMod & \text{coefficients for cost model} \\
     \end{array}
   \end{equation*}
@@ -133,10 +136,6 @@ types of scripts. Recall here that these only have non-trivial values for
   \emph{Derived types}
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
-      \var{plv} & \Language
-      & \N \times \N \times \N
-      & \text{Plutus interpreter version}
-      \\
       \var{(pr_{init}, pr_{mem}, pr_{steps})}
       & \Prices
       & \Coin \times \Coin \times \Coin
@@ -171,7 +170,7 @@ types of scripts. Recall here that these only have non-trivial values for
   \begin{align*}
     & \fun{hashPlutusPP} \in \PParams \to \powerset{(\Language)} \to \HashPP^?   \\
     & \fun{hashPlutusPP}~\var{pp}~\var{pv} = \begin{cases}
-         \fun{hash}~(\var{pv} \restrictdom \fun{costmdls}~{pp}) 
+         \fun{hash}~(\var{pv} \restrictdom \fun{costmdls}~{pp})
                            & \text{if~} \var{pv} \restrictdom \fun{costmdls}~{pp} \neq \{\} \\
               \Nothing & \text{otherwise} \\
       \end{cases} \\

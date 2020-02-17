@@ -119,7 +119,7 @@ except for the following changes and additions:
       & \Data
       & \mathbb{N}\uniondistinct\mathbb{H}\uniondistinct(\mathbb{N}\times\seqof{\Data})
         \uniondistinct\seqof{\Data}\uniondistinct\seqof{\Data \times \Data}
-      & \text{the $\Data$ type}\\
+%      & \text{the $\Data$ type}\\
     \end{array}
   \end{equation*}
 %
@@ -380,11 +380,11 @@ for script interpreter versions of the scripts inside the transaction.
   %
   \begin{align*}
     \fun{language} ~\in~& \Script \to \Language \\
-    &\text{returns the language tag, $\var{plcV1Tag}$ for Plutus V1} \\
+    &\text{returns the language tag, $\mathsf{plcV1Tag}$ for Plutus V1} \\
     \nextdef
     \fun{plclangs} ~\in~& \powerset{\Script} \to \powerset{(\Language)} \\
     \fun{plclangs}~ \var{scrts} ~=~ & \{ \fun{language}~\var{scr} ~\vert~
-      \var{scr}~\in~ \var{scrts}, \fun{language}~\var{scr} \in \{\var{plcV1Tag} \}  \}\\
+      \var{scr}~\in~ \var{scrts}, \fun{language}~\var{scr} \in \{\mathsf{plcV1Tag} \}  \}\\
     &\text{Get all Plutus versions used in scripts (just V1 at this time)} \\
   \end{align*}
   \caption{Languages and Plutus Versions}
@@ -510,12 +510,6 @@ are presented.
      &\fun{valPLCupTo} \in \CostMod \to\ScrPLC \to
     (\seqof{\Data} \times \ExUnits) \to (\IsValidating \times \ExUnits) \\
      &\text{resource-restricted validation of a Plutus script}
-  \end{align*}
-  \emph{Helper Script Validation Functions}
-  %
-  \begin{align*}
-     &\fun{hashScript} \in  ~\Script\to \Language \\
-     &\text{compute script hash} \\~\\
   \end{align*}
   %
   \emph{Notation}

@@ -20,7 +20,7 @@ for paying transaction fees
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn}
+    & \fun{txinputs_{vf}} \in \Tx \to \powerset{\TxIn} \\
     & \text{tx VK inputs used for fees} \\
     & \fun{txinputs_{vf}} ~tx~= \\
     &~~\{ (txid,ix)~\vert~((txid,ix),\var{isfee}) \in
@@ -35,7 +35,7 @@ for paying transaction fees
               \fun{getDataHash}~\var{txout}) & \text{otherwise}
             \end{cases}
     \nextdef
-    & \fun{outs} \in \Slot \to \Tx \to \UTxO
+    & \fun{outs} \in \Slot \to \Tx \to \UTxO \\
     & \text{tx outputs as UTxO} \\
     & \fun{outs} ~ \var{slot}~\var{tx} =
         \left\{
@@ -44,7 +44,8 @@ for paying transaction fees
           \var{ix} \mapsto \var{txout} \in \txouts{tx}
         \right\} \\
     \nextdef
-    & \fun{txins} \in \Tx \to \powerset{\TxIn} & \text{transaction inputs} \\
+    & \fun{txins} \in \Tx \to \powerset{\TxIn} \\
+    & \text{transaction inputs} \\
     & \fun{txins} ~\var{tx} = \{(txid,ix) \mid ((txid,ix),\wcard)\in\fun{txinputs} ~tx\} \\
   \end{align*}
   \caption{Functions on Tx Inputs and Outputs}
@@ -174,7 +175,7 @@ its inputs. In particular, it returns a validator script together with
   \begin{align*}
     &\fun{indexof} \in \seqof{\DCert} \to \DCert \to \Ix\\
     &\fun{indexof} \in \Wdrl \to \Wdrl \to \Ix\\
-    &\fun{indexof} \in \powerset{TxInTx} \to \TxInTx \to \Ix\\
+    &\fun{indexof} \in \powerset{\TxInTx} \to \TxInTx \to \Ix\\
     &\fun{indexof} \in \Value \to \Value \to \Ix\\
     & \text{get the index of an item in the an ordered representation} \\
   \end{align*}
@@ -189,9 +190,9 @@ its inputs. In particular, it returns a validator script together with
     & \text{make a finite map of hash-indexed data values} \\
     &\fun{indexedDats}~{tx} ~=~ \{ h \mapsto d ~\vert~ \fun{hashData}~{d}~=~h, d\in~\fun{txdats}~\var{tx}\}
     \nextdef
-    &\fun{findRdmr} \in \Tx \to \CurItem \to \powerset{\Data}\\
-    & \text{get redeemer corresponding to index} \\
-    & \fun{findRdmr}~{tx}~\var{it} ~=~ \{ r ~\vert~ \\
+    &\fun{findRdmrSet} \in \Tx \to \CurItem \to \powerset{\Data}\\
+    & \text{get empty set or redeemer corresponding to index} \\
+    & \fun{findRdmrSet}~{tx}~\var{it} ~=~ \{~ r ~\vert~ \\
     &~~(\mathsf{certTag}, \fun{indexof}~(\fun{txcerts}~{tx})~\var{it}) \mapsto ~r \in \fun{txrdmrs}~{tx} \\
     &~~\vee~ (\mathsf{wdrlTag}, \fun{indexof}~(\fun{txwdrls}~{tx})~\var{it})
       \mapsto ~r \in \fun{txrdmrs}~{tx} \\
@@ -200,11 +201,18 @@ its inputs. In particular, it returns a validator script together with
     &~~\vee~(\mathsf{inputTag}, \fun{indexof}~(\fun{txinputs}~{tx})~\var{it}) \mapsto ~r
       \in \fun{txrdmrs}~{tx} \}
     \nextdef
+    &\fun{findRdmr} \in \Tx \to \CurItem \to \powerset{\Data}\\
+    & \text{get redeemer corresponding to index or return Nothing} \\
+    & \fun{findRdmr}~{tx}~\var{it} ~=~\begin{cases}
+         \{\Nothing_d\} & \text{if~} \fun{findRdmrSet}~{tx}~\var{it}~=~\{\} \\
+              \fun{findRdmrSet}~{tx}~\var{it}~ & \text{otherwise}
+            \end{cases}
+    \nextdef
     & \fun{mkPLCLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptPlutus,\seqof{\Data})} \\
     & \text{a list of all Plutus validators and corresponding input data} \\
     & \fun{mkPLCLst}  ~\var{pp}~\var{tx}~ \var{utxo} ~=~
-    \fun{toList}~(\fun{allCertScrts}~\var{pp}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~\var{pp}~{utxo}~{tx} \\
-    & ~~ \cup \fun{allInsScrts}~\var{pp}~{utxo}~{tx} ~~ \cup \fun{forgedScrts}~\var{pp}~{utxo}~{tx}) \\
+    \fun{toList}~(\fun{allCertScrts}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~{utxo}~{tx} \\
+    & ~~ \cup \fun{allInsScrts}~{utxo}~{tx} ~~ \cup \fun{forgedScrts}~{utxo}~{tx}) \\
   \end{align*}
   \caption{Combining Script Validators and their Inputs}
   \label{fig:functions:script1}
@@ -272,7 +280,7 @@ fees required.
     & ~~\var{cert} \in (\DCertDeRegKey\cap\fun{txcerts}~\var{tx}), \\
     &~~\fun{regCred}~\var{cert}\mapsto \var{script_v}\in \fun{indexedScripts}~{tx}, \\
     & ~~\var{script_v} \in \ScriptPlutus
-     \} \\
+     \}
     %
     \nextdef
     & \fun{allWDRLSScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
@@ -294,7 +302,7 @@ fees required.
     & ~~r \in \fun{findRdmr}~{tx}~(\var{cid}\mapsto ~ \var{tkns}), \\
     & ~~\var{cid}\mapsto ~ \var{tkns} \in \fun{forge}~\var{tx}, \\
     &~~\var{cid}\mapsto \var{script_v}\in \fun{indexedScripts}~{tx}
-     \} \\
+     \}
     %
   \end{align*}
   \caption{Scripts and their Arguments}
@@ -727,7 +735,7 @@ from the original Shelley spec):
       \txins{tx} \neq \emptyset
       & \txins{tx} \subseteq \dom \var{utxo}
       \\
-      \fun{range}~(\{ (txid,ix) \vert (txid,ix,\Yes) \in \txins{tx} \} \restrictdom \var{utxo})
+      \fun{range}~(\fun{txinputs_{vf}}~{tx} \restrictdom \var{utxo})
       \subseteq \TxOutND \\
       \consumed{pp}{utxo}{stdelegs}{rewards}~{tx} = \produced{slot}~{pp}~{stpools}~{tx}
       \\~\\
@@ -743,7 +751,8 @@ from the original Shelley spec):
       \\
       ~
       \\
-      \forall txout \in \txouts{tx}, \fun{getValue}~txout \geq \fun{makeZeros}~0 \\
+      \forall txout \in \txouts{tx}, q~ \in~ \{~q~\vert~ c\mapsto (t\mapsto q) \in \fun{getValue}~txout\} \\
+      \Rightarrow q ~\geq ~0 \\
       \forall \mathsf{adaID}\mapsto{tkns} \in \txouts{tx},
       \fun{dom}~\var{tkns} = \{\mathsf{adaToken}\}
       \\
@@ -768,7 +777,7 @@ from the original Shelley spec):
       \\
       \fun{plclangs}~(\fun{txscripts}~\var{tx}) \subseteq \fun{dom}~(\fun{costmdls}~{tx}) \\
       \fun{plclangs}~(\fun{txscripts}~\var{tx}) ~=~ \{\} \Rightarrow \fun{hashPP}~{tx}~=~\Nothing \\ \fun{plclangs}~(\fun{txscripts}~\var{tx}) \neq \{\} \Rightarrow \\
-      \fun{hashPlutusPP}~\var{pp}~(\fun{plclangs}~(\fun{txscripts}~\var{tx})) =  \fun{hashPP}~{tx} \\
+      \fun{hashPlutusPP}~\var{pp}~(\fun{plclangs}~(\fun{txscripts}~\var{tx})) =  \fun{hashPP}~{tx} \\~\\
       \fun{txdats}~\var{tx} ~=~ \{\} \Rightarrow \fun{hashDVs}~{tx}~=~\Nothing \\
       \fun{txdats}~\var{tx} ~\neq~ \{\} \Rightarrow
       \fun{hash}~(\fun{txdats}~\var{tx})~ =~  \fun{hashDVs}~{tx} \\
