@@ -75,7 +75,7 @@ block (stored as a protocol parameter).
       &
       \fun{hash}~{txs} = \bbodyhash{bhb}
       \\~\\
-      \sum_{tx\in txs} \fun{txexunits}~{tx} \leq \fun{maxBlockExUnits}~\var{pp}
+      \sum_{tx\in txs} \fun{txexunits}~(\txbody~{tx}) \leq \fun{maxBlockExUnits}~\var{pp}
       \\~\\
       {
         {\begin{array}{c}
@@ -138,7 +138,7 @@ type as $\PParams$.
   \begin{align*}
       & \fun{mkUTxO} ~\in~ \Slot \to \UTxO  \to \UTxO  \\
       & \fun{mkUTxO}~s~\var{utxo} ~=~ \{~ \var{txin} \mapsto ((a,\fun{toValue}~c),s) ~\vert~
-      \var{txin} \mapsto \var{(a,c)}~\} \\
+      \var{txin} \mapsto \var{(a,c)}\in ~\var{utxo}~\} \\
       & \text{make UTxO Goguen}
       \nextdef
       & \fun{toGoguen} \in ~ \ChainState \to \GoguenChainState \\
@@ -160,12 +160,12 @@ processable in the Goguen era.
 \begin{figure}[htb]
   \emph{Functions}
   \begin{align*}
-      & \fun{mkIns} ~\in~ \powerset{\TxInShelley} \to \powerset{\TxInTx}  \\
+      & \fun{mkIns} ~\in~ \powerset{\TxInShelley} \to \powerset{\TxIn}  \\
       & \fun{mkIns}~\var{ins} ~=~ \{~ (\var{txin}, \Nope) ~\vert~
       \var{txin} \in \var{ins}~\} \\
       & \text{transform Shelley inputs into Goguen inputs}
       \nextdef
-      & \fun{mkOuts} ~\in~ (\Ix \mapsto \TxOutShelley) \to (\Ix \mapsto \TxOut) \\
+      & \fun{mkOuts} ~\in~ (\Ix \mapsto \TxOutShelley) \to (\Ix \mapsto \OutFoo) \\
       & \fun{mkOuts}~\var{outs} ~=~ \{~ \var{ix} \mapsto \var{(a,\fun{toValue}~c)} ~\vert~
       \var{ix} \mapsto \var{(a,c)} \in \var{outs}~\} \\
       & \text{transform Shelley inputs into Goguen inputs}

@@ -84,7 +84,7 @@ resources during transaction processing (see Section~\ref{sec:utxo}).
 
 Currently, the only additional data passed to the interpreter (and therefore must
 be hashed during transaction processing) is in the protocol parameters. The
-function $\fun{hashPlutusPP}$ selects the protocol parameters relevant to
+function $\fun{hashLanguagePP}$ selects the protocol parameters relevant to
 the a given set of Plutus interpreter versions and computes their hash.
 
 The only parameter passed to the interpreter (at this time, for any version) is the cost model
@@ -168,10 +168,10 @@ types of scripts. Recall here that these only have non-trivial values for
   \emph{Selector Functions}
   %
   \begin{align*}
-    & \fun{hashPlutusPP} \in \PParams \to \powerset{(\Language)} \to \HashPP^?   \\
-    & \fun{hashPlutusPP}~\var{pp}~\var{pv} = \begin{cases}
-         \fun{hash}~(\var{pv} \restrictdom \fun{costmdls}~{pp})
-                           & \text{if~} \var{pv} \restrictdom \fun{costmdls}~{pp} \neq \{\} \\
+    & \fun{hashLanguagePP} \in \PParams \to \powerset{(\Language)} \to \PPHash^?   \\
+    & \fun{hashLanguagePP}~\var{pp}~\var{lgs} = \begin{cases}
+         \fun{hash}~(\var{lgs} \restrictdom \fun{costmdls}~{pp})
+                           & \text{if~} \var{lgs} \restrictdom \fun{costmdls}~{pp} \neq \{\} \\
               \Nothing & \text{otherwise} \\
       \end{cases} \\
     & \text{this calculation hashes the current protocol parameters relevant to

@@ -16,6 +16,7 @@ validation tag is verified, and script fees are collected.
     \label{eq:ledger}
     \inference[ledger-V]
     {
+      \var{txb}\leteq\txbody{tx} \\
       \fun{txvaltag}~{tx} \in \Yes \\~\\
       {
         \begin{array}{c}
@@ -28,7 +29,7 @@ validation tag is verified, and script fees are collected.
       }
       \vdash
       dpstate \trans{\hyperref[fig:rules:delegation-sequence]{delegs}}{
-                     \fun{txcerts}~\var{tx}} dpstate'
+                     \fun{txcerts}~\var{txb}} dpstate'
       \\~\\
       (\var{dstate}, \var{pstate}) \leteq \var{dpstate} \\
       (\var{stkCreds}, \_, \_, \_, \_, \var{genDelegs}) \leteq \var{dstate} \\

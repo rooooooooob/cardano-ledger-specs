@@ -62,9 +62,9 @@ except for the following changes and additions:
   \ref{sec:utxo} for details). All inputs can be marked as for-fees in
   the name of privacy concerns.
 
-  \item $\TxInTx$ is a transaction input (now distinct from the input $\TxIn$ in
+  \item $\TxIn$ is a transaction input (now distinct from the input $\OutRef$ in
   a UTxO entry). It includes the reference to the UTxO entry it is spending
-  (the $\TxIn$ part) and the $\IsFee$ tag, which indicates if this input should
+  (the $\OutRef$ part) and the $\IsFee$ tag, which indicates if this input should
   be used to pay script execution fees. Only VK-spending inputs can be used to
   pay fees.
 
@@ -94,7 +94,7 @@ except for the following changes and additions:
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
       \var{h} &\ScriptHash & \text{ script hash}\\
-      \var{hdv} &\HashDVs & \text{hash of the indexed DV structure}\\
+      \var{hdv} &\RdmrsHash & \text{hash of the indexed redeemers structure}\\
       \var{tok} & \Token & \text{token identifier}\\
       \var{quan} & \Quantity & \text{quantity of a token}\\
       \var{msig} & \ScriptMSig & \text{Multisig scripts} \\
@@ -142,8 +142,8 @@ except for the following changes and additions:
 %      & \text {tag for outputs that come with data values}
       \\
       \var{txin}
-      & \TxInTx
-      & \TxIn \times \IsFee
+      & \TxIn
+      & \OutRef \times \IsFee
 %      & \text{transaction input}
       \\
       (\var{addr}, v)
@@ -156,30 +156,30 @@ except for the following changes and additions:
       & \type{TxOutND} \times \DataHash
 %      & \text{script address output}
       \\
-      \var{txout}
-      & \TxOut
+      \var{out}
+      & \OutFoo
       & \TxOutND \uniondistinct \TxOutP
 %      & \text{transaction outputs}
       \\
       \var{txotx}
-      & \TxOutTx
+      & \TxOut
       & \TxOutND \uniondistinct (\TxOutP \times \HasDV)
 %      & \text{transaction outputs in a transaction}
       \\
       \var{utxo}
       & \UTxO
-      & \TxIn \mapsto (\TxOut \times \Slot)
+      & \OutRef \mapsto (\OutFoo \times \Slot)
 %      & \text{unspent tx outputs}
       \\
       \var{dvin}
-      & \TypeIx
+      & \RdmrPtr
       & (\mathsf{inputTag} \uniondistinct \mathsf{forgeTag} \uniondistinct
       \mathsf{certTag} \uniondistinct \mathsf{wdrlTag}) \times \Ix
 %      & \text{reverse pointer to thing dv is for}
       \\
       \var{cur}
       & \CurItem
-      & \ScriptHash \uniondistinct \TxIn \uniondistinct \Wdrl \uniondistinct \DCert
+      & \ScriptHash \uniondistinct \OutRef \uniondistinct \Wdrl \uniondistinct \DCert
 %      & \text{item the script is validated for}
     \end{array}
   \end{equation*}
@@ -208,7 +208,7 @@ In Figure \ref{fig:defs:utxo-shelley-2}, the we have made the following changes 
 the body of the transaction:
 
 \begin{itemize}
-  \item transaction inputs have the type $\TxInTx$
+  \item transaction inputs have the type $\TxIn$
   \item the
   time to live $\Slot$ was replaced by a liveness interval $\Slot \times \Slot$,
   where the first slot is accessed by $\fun{txlst}$.
@@ -223,7 +223,7 @@ the body of the transaction:
   before the transaction is submitted, with accessor $\fun{txexunits}$
   \item the body has the hash of the current protocol parameters
   (only the ones relevant to Plutus script validation of each Plutus
-  version of the transaction's validators), $\HashPP$, with accessor $\fun{hashPP}$
+  version of the transaction's validators), $\PPHash$, with accessor $\fun{ppHash}$
   \item finally, there is a hash of the $\TxWitness$
   part of the transaction (except the signatures themselves!),
   with accessor $\fun{txwitshash}$
@@ -297,51 +297,58 @@ the following:
   in the whole block being invalid, which benefits no one.
 \end{itemize}
 
-We have changed $\fun{txinputs}$ to map to $\TxInTx$, and added other the relevant
+We have changed $\fun{txinputs}$ to map to $\TxIn$, and added other the relevant
 accessor functions.
 
 \begin{figure*}[htb]
   \emph{Transaction Types}
   %
-  \begin{align*}
-    \var{wits} ~\in~ & \TxWitness & (\VKey \mapsto \Sig) \times \powerset{\Script} \times \powerset{\Data}
-    \times (\TypeIx \mapsto \Data)
-  \end{align*}
-  %
-  \begin{align*}
-    \var{txbody} ~\in~
-    & \TxBody ~=~
-    & \powerset{\TxInTx} \times (\Ix \mapsto \TxOutTx) \times \seqof{\DCert}
-      \times \Value \times \ExUnits \times \Coin \\
-    & ~& \times (\Slot\times\Slot) \times~ \Wdrl \times \Update \times \HashPP^? \times \HashDVs^?
-  \end{align*}
+  \begin{equation*}
+    \begin{array}{r@{~~}r@{~~}l@{\qquad}l}
+      \var{wits} ~\in~ \TxWitness ~=~
+       & (\VKey \mapsto \Sig) & \fun{txwitsVKey} & \text{VK signatures}\\
+       & \times ~\powerset{\Script}  & \fun{txscripts} & \text{all scripts}\\
+       & \times~ \powerset{\Data} & \fun{txdats} & \text{all datavalues}\\
+       & \times ~(\RdmrPtr \mapsto \Data)& \fun{txrdmrs}& \text{indexed redeemers}\\
+    \end{array}
+  \end{equation*}
   %
   \begin{equation*}
-    \begin{array}{r@{~\in~}l@{\qquad=\qquad}l}
-      \var{tx}
-      & \Tx
-      & \TxBody \times \TxWitness \times \IsValidating
+    \begin{array}{r@{~~}r@{~~}l@{\qquad}l}
+      \var{txbody} ~\in~ \TxBody ~=~
+      & \powerset{\TxIn} & \fun{txinputs}& \text{inputs}\\
+      &\times ~(\Ix \mapsto \TxOut) & \fun{txouts}& \text{outputs}\\
+      & \times~ \seqof{\DCert} & \fun{txcerts}& \text{certificates}\\
+       & \times ~\Value  & \fun{forge} &\text{value forged}\\
+       & \times ~\ExUnits  & \fun{txexunits}& \text{script exec budget}\\
+       & \times ~\Coin & \fun{txfee} &\text{non-script fee}\\
+       & \times ~(\Slot\times\Slot) & \fun{txttl},~\fun{txlst} & \text{validity interval}\\
+       & \times~ \Wdrl  & \fun{txwdrls} &\text{reward withdrawals}\\
+       & \times ~\Update  & \fun{txUpdates} & \text{update proposals}\\
+       & \times ~\PPHash^?  & \fun{ppHash} & \text{hash or PPs}\\
+       & \times ~\RdmrsHash^? & \fun{rdmrsHash} & \text{hash of indexed rdmrs}\\
+       & \times ~\MetaDataHash^? & \fun{txMDhash} & \text{metadata hash}\\
+    \end{array}
+  \end{equation*}
+  %
+  \begin{equation*}
+    \begin{array}{r@{~~}r@{~~}l@{\qquad}l}
+      \var{tx} ~\in~ \Tx ~=~
+      & \TxBody & \fun{txbody} & \text{body}\\
+      & \times ~\TxWitness & \fun{txwits} & \text{witnesses}\\
+      & \times ~\IsValidating & \fun{txvaltag}&\text{validation tag}\\
+      & \times ~\MetaData^? & \fun{txMD}&\text{metadata}\\
     \end{array}
   \end{equation*}
   %
   \emph{Accessor Functions}
   \begin{equation*}
     \begin{array}{r@{~\in~}lr}
-      \fun{txinputs} & \Tx \to \powerset{\TxInTx} & \text{transaction inputs} \\
-      \fun{txlst} & \Tx \to \Slot & \text{start of liveness interval} \\
-      \fun{getValue} & \TxOut \uniondistinct \TxOutTx \to \Value & \text{output value} \\
-      \fun{getAddr} & \TxOut \uniondistinct \TxOutTx \to \Addr & \text{output address} \\
-      \fun{inref} & \TxInTx \to \TxIn & \text{input reference $(txid,ix)$} \\
-      \fun{getDataHash} & \TxOut \uniondistinct \TxOutTx \to \DataHash & \text{data hash} \\
-      \fun{getDataTag} & \TxOutTx \to \HasDV & \text{data} \\
-      \fun{forge} & \Tx \to \Value & \text{value forged by tx}\\
-      \fun{txexunits} & \Tx \to \ExUnits & \text{portion of fee allocated for scripts}\\
-      \fun{hashPP} & \Tx \to \HashPP^? & \text{hash of the Plutus params}\\
-      \fun{hashDVs} & \Tx \to \HashDVs^? & \text{hash of the attached data values}\\
-      \fun{txvaltag} & \Tx \to \IsValidating & \text{transaction validation tag}\\
-      \fun{txscripts} & \Tx \to \powerset{\Script} & \text{all scripts}\\
-      \fun{txrdmrs} & \Tx \to \powerset{\Script} & \text{all redeemers}\\
-      \fun{txdats} & \Tx \to (\TypeIx \mapsto \Data) & \text{indexed data value terms}\\
+      \fun{getValue} & \TxOut \uniondistinct \OutFoo \to \Value & \text{output value} \\
+      \fun{getAddr} & \TxOut \uniondistinct \OutFoo \to \Addr & \text{output address} \\
+      \fun{outref} & \TxIn \to \OutRef & \text{output reference $(txid,ix)$} \\
+      \fun{getDataHash} & \TxOut \uniondistinct \OutFoo \to \DataHash & \text{data hash} \\
+      \fun{getDataTag} & \TxOut \to \HasDV & \text{data} \\
     \end{array}
   \end{equation*}
   \caption{Definitions used in the UTxO transition system, cont.}
@@ -350,9 +357,9 @@ accessor functions.
 
 To select the right subset of ledger protocol parameters to hash, we need to
 first make a set of all the interpreter versions of all the scripts the
-transaction is carrying. This is done by the function $\fun{plclangs}$,
+transaction is carrying. This is done by the function $\fun{cmlangs}$,
 see Figure \ref{fig:defs:functions-chain-helper}. Then, the parameters
-relevant to all those versions are selected and hashed by $\fun{hashPlutusPP}$.
+relevant to all those versions are selected and hashed by $\fun{hashLanguagePP}$.
 
 Note that at this time, only data from the protocol parameters must be hashed
 for the comparison we defined. For future Plutus versions, parts of the ledger
@@ -382,10 +389,10 @@ for script interpreter versions of the scripts inside the transaction.
     \fun{language} ~\in~& \Script \to \Language \\
     &\text{returns the language tag, $\mathsf{plcV1Tag}$ for Plutus V1} \\
     \nextdef
-    \fun{plclangs} ~\in~& \powerset{\Script} \to \powerset{(\Language)} \\
-    \fun{plclangs}~ \var{scrts} ~=~ & \{ \fun{language}~\var{scr} ~\vert~
+    \fun{cmlangs} ~\in~& \powerset{\Script} \to \powerset{(\Language)} \\
+    \fun{cmlangs}~ \var{scrts} ~=~ & \{ \fun{language}~\var{scr} ~\vert~
       \var{scr}~\in~ \var{scrts}, \fun{language}~\var{scr} \in \{\mathsf{plcV1Tag} \}  \}\\
-    &\text{Get all Plutus versions used in scripts (just V1 at this time)} \\
+    &\text{get all languages that have cost models (just Plutus V1 at this time)} \\
   \end{align*}
   \caption{Languages and Plutus Versions}
   \label{fig:defs:functions-chain-helper}
@@ -472,10 +479,10 @@ are presented.
   \item $\fun{validationData}$ constructs the PendingTx value passed
   to the script interpreter
   \item $\fun{hashScript},~ \fun{hashData}$ are abstract hashing functions.
-  \item $\fun{valMSigupTo}$ (replacing $\fun{evaluateScript}$ in the ledger spec) performs
+  \item $\fun{runMSigScript}$ (replacing $\fun{evaluateScript}$ in the ledger spec) performs
   validation for multi-sig scripts.
   This validation works exactly as before.
-  \item $\fun{valPLCupTo}$ performs validation for Plutus scripts. It takes the following
+  \item $\fun{runPLCScript}$ performs validation for Plutus scripts. It takes the following
   arguments:
   \begin{itemize}
   \item A cost model. The specific cost model is selected according to the Plutus
@@ -505,9 +512,9 @@ are presented.
      &\text{compute hash of data} \\~\\
      &\fun{validationData} \in  \UTxO \to \Tx \to \CurItem \to \Data \\
      &\text{build Validation Data} \\~\\
-     &\fun{valMSigupTo} \in\ScriptMSig\to \Tx \to \IsValidating  \\
+     &\fun{runMSigScript} \in\ScriptMSig\to \Tx \to \IsValidating  \\
      &\text{validation of a multi-sig script} \\~\\
-     &\fun{valPLCupTo} \in \CostMod \to\ScrPLC \to
+     &\fun{runPLCScript} \in \CostMod \to\ScriptPlutus \to
     (\seqof{\Data} \times \ExUnits) \to (\IsValidating \times \ExUnits) \\
      &\text{resource-restricted validation of a Plutus script}
   \end{align*}
@@ -516,7 +523,7 @@ are presented.
   %
   \begin{align*}
     \llbracket \var{script_v} \rrbracket_{\var{cm},\var{exunits}}(\var{dataval},~\var{rdmr},~\var{ptx})
-    &=& \fun{valPLCupTo} ~{cm}~\var{script_v}~((\var{dataval};~\var{rdmr};~\var{ptx};\epsilon),~
+    &=& \fun{runPLCScript} ~{cm}~\var{script_v}~((\var{dataval};~\var{rdmr};~\var{ptx};\epsilon),~
     \var{exunits})
   \end{align*}
   \caption{Script Validation, cont.}
