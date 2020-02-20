@@ -111,13 +111,14 @@ test-suite delegation-test
                          MultiSigExamples
                          Mutator
                          Generator
-                         Generator.Core.Constants
                          Generator.Block
-                         Generator.Core.QuickCheck
                          Generator.ChainTrace
-                         Generator.LedgerTrace.QuickCheck
+                         Generator.Core.Constants
+                         Generator.Core.QuickCheck
                          Generator.Delegation.QuickCheck
+                         Generator.LedgerTrace.QuickCheck
                          Generator.Update.QuickCheck
+                         Generator.Core.KeySpace
                          Generator.Utxo.QuickCheck
                          PropertyTests
                          Shrinkers
