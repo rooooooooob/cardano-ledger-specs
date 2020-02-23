@@ -1,5 +1,6 @@
 import           Test.Tasty
 
+import           PoolRankTests (poolRankTests)
 import           PropertyTests (minimalPropertyTests)
 import           STSTests (stsTests)
 import           Test.Serialization (serializationTests)
@@ -13,6 +14,7 @@ tests = testGroup "Ledger with Delegation"
   , serializationTests
   , stsTests
   , unitTests
+  , poolRankTests
   ]
 
 -- main entry point

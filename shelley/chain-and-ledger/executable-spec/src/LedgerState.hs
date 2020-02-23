@@ -10,14 +10,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-|
-Module      : LedgerState
-Description : Operational Rules
-
-This module implements the operation rules for treating UTxO transactions ('Tx')
-as state transformations on a ledger state ('LedgerState'),
-as specified in /A Simplified Formal Specification of a UTxO Ledger/.
--}
 
 module LedgerState
   ( LedgerState(..)
@@ -968,12 +960,12 @@ poolRewards
   -> Coin
   -> Coin
 poolRewards d_ sigma blocksN blocksTotal (Coin maxP) =
-  if intervalValue d_ < 0.8
-    then floor (p * fromIntegral maxP)
-    else 1
+  floor (pBar * fromIntegral maxP)
   where
-    p = beta / intervalValue sigma
     beta = fromIntegral blocksN / fromIntegral (max 1 blocksTotal)
+    pBar = if intervalValue d_ < 0.8
+             then beta / intervalValue sigma
+             else 1
 
 -- | Calculate pool leader reward
 leaderRew
@@ -1054,7 +1046,7 @@ reward
 reward pp (BlocksMade b) r addrsRew poolParams stake@(Stake stake') delegs =
   rewards'
   where
-    total = Map.foldl (+) (Coin 0) stake'
+    total = sum stake'
     pdata =
       [ ( hk
         , ( poolParams Map.! hk
@@ -1069,7 +1061,7 @@ reward pp (BlocksMade b) r addrsRew poolParams stake@(Stake stake') delegs =
       | (hk, (pool, n, actgr)) <- pdata
       ]
     rewards' = foldl (\m (_, r') -> Map.union m r') Map.empty results
-    totalBlocks = Map.foldr (+) 0 b
+    totalBlocks = sum b
 
 -- | Stake distribution
 stakeDistr
