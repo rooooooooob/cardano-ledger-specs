@@ -130,22 +130,22 @@ type as $\PParams$.
       & \NewParams ~=~ (\Language \mapsto \CostMod) \times \Prices \times \ExUnits \times \ExUnits \\
       & \text{the type of new parameters to add for Goguen}
       \nextdef
-      & \mathsf{IVs} ~\in~ \NewParams \\
+      & \mathsf{ivPP} ~\in~ \NewParams \\
       & \text{the initial values for new Goguen parameters}
   \end{align*}
   \emph{Shelley to Goguen Transition Functions}
   %
   \begin{align*}
-      & \fun{mkUTxO} ~\in~ \Slot \to \UTxO  \to \UTxO  \\
+      & \fun{mkUTxO} ~\in~ \Slot \to \ShelleyUTxO  \to \UTxO  \\
       & \fun{mkUTxO}~s~\var{utxo} ~=~ \{~ \var{txin} \mapsto ((a,\fun{toValue}~c),s) ~\vert~
       \var{txin} \mapsto \var{(a,c)}\in ~\var{utxo}~\} \\
       & \text{make UTxO Goguen}
       \nextdef
-      & \fun{toGoguen} \in ~ \ChainState \to \GoguenChainState \\
+      & \fun{toGoguen} \in ~ \ShelleyChainState \to \ChainState \\
       & \fun{toGoguen}~((v_1, v_2, v_3, (v_4, v_5, (\var{utxo}, v_6), \var{pp}),
       v_7, v_8, v_8, v_{10}), v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
       & ~~ = ((v_1, v_2, v_3, (v_4, v_5, (\fun{mkUTxO}~s_{last}~\var{utxo}, v_6),
-       \var{pp}\cup \mathsf{IVs}),
+       \var{pp}\cup \mathsf{ivPP}),
       v_7, v_8, v_8, v_{10}), v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
       & \text{transform Shelley chain state to Goguen state}
   \end{align*}
@@ -160,21 +160,21 @@ processable in the Goguen era.
 \begin{figure}[htb]
   \emph{Functions}
   \begin{align*}
-      & \fun{mkIns} ~\in~ \powerset{\TxInShelley} \to \powerset{\TxIn}  \\
-      & \fun{mkIns}~\var{ins} ~=~ \{~ (\var{txin}, \Nope) ~\vert~
+      & \fun{mkIns} ~\in~ \powerset{\ShelleyTxIn} \to \powerset{\TxIn}  \\
+      & \fun{mkIns}~\var{ins} ~=~ \{~ (\var{txin}, \Yes) ~\vert~
       \var{txin} \in \var{ins}~\} \\
       & \text{transform Shelley inputs into Goguen inputs}
       \nextdef
-      & \fun{mkOuts} ~\in~ (\Ix \mapsto \TxOutShelley) \to (\Ix \mapsto \OutFoo) \\
+      & \fun{mkOuts} ~\in~ (\Ix \mapsto \ShelleyTxOut) \to (\Ix \mapsto \TxOut) \\
       & \fun{mkOuts}~\var{outs} ~=~ \{~ \var{ix} \mapsto \var{(a,\fun{toValue}~c)} ~\vert~
       \var{ix} \mapsto \var{(a,c)} \in \var{outs}~\} \\
       & \text{transform Shelley inputs into Goguen inputs}
       \nextdef
-      & \fun{toGoguenTx} ~\in~ \Slot \to  \ShelleyTx \to \Tx \\
+      & \fun{toGoguenTx} ~\in~ \Slot \to  \ShelleyTx \to \GoguenTx \\
       & \fun{toGoguenTx}~s_{last}~((\var{ins}, \var{outs},
       v_3, v_4, v_5, v_6, v_7), \wcard) ~=~\\
       &~~((\fun{mkIns}~\var{ins}, \fun{mkOuts}~\var{outs}, v_3, \epsilon,
-      (0, 0), v_4, (v_5, s_{last}), v_6, v_7, \Nothing, \Nothing), \wcard) \\
+      (0, 0), v_4, (s_{last}, v_5), v_6, v_7, \Nothing, \Nothing), \wcard) \\
       & \text{transform a Shelley transaction into a Goguen transaction}
   \end{align*}
   \caption{Shelley to Goguen Transaction Interpretation}

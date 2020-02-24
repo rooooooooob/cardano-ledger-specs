@@ -86,6 +86,7 @@ Currently, the only additional data passed to the interpreter (and therefore mus
 be hashed during transaction processing) is in the protocol parameters. The
 function $\fun{hashLanguagePP}$ selects the protocol parameters relevant to
 the a given set of Plutus interpreter versions and computes their hash.
+See Figure~\ref{fig:defs:protocol-parameters}.
 
 The only parameter passed to the interpreter (at this time, for any version) is the cost model
 corresponding to that version, so it is also the only parameter included
@@ -165,7 +166,7 @@ types of scripts. Recall here that these only have non-trivial values for
   \fun{costmdls},~\fun{maxTxExUnits},~\fun{maxBlockExUnits},~\fun{prices}
   \end{center}
   %
-  \emph{Selector Functions}
+  \emph{Helper Functions}
   %
   \begin{align*}
     & \fun{hashLanguagePP} \in \PParams \to \powerset{(\Language)} \to \PPHash^?   \\

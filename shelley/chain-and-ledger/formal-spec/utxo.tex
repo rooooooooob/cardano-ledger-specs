@@ -12,7 +12,7 @@ given in Figure \ref{fig:functions:insouts}. These include
 \begin{itemize}
   \item The function $\fun{txinputs_{vf}}$ returns only the inputs selected to be used
 for paying transaction fees
-  \item The function $\fun{txins}$ that returns $\OutRef$ part of both script
+  \item The function $\fun{txins}$ that returns UTxO output reference part of both script
   and non-script transaction inputs.
   \item The function $\fun{outs}$ adds the slot number of the block in which transaction is
   included to the outputs now
@@ -20,14 +20,24 @@ for paying transaction fees
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{txinputs_{vf}} \in \TxBody \to \powerset{\OutRef} \\
+    & \fun{txinputs_{vf}} \in \TxBody \to \powerset{\TxId \times \Ix} \\
     & \text{tx VK inputs used for fees} \\
     & \fun{txinputs_{vf}} ~txb~= \\
     &~~\{ (txid,ix)~\vert~((txid,ix),\var{isfee}) \in
     \fun{txinputs} ~txb,~
      \var{isfee}\in\Yes\}
     \nextdef
-    & \fun{getOut} \in \TxOut \to \OutFoo \\
+    & \fun{feesOK} \in \N \to \PParams \to \GoguenTx \to \UTxO \to \Bool  \\
+    & \text{check if fee-marked inputs are Ada-only and enough to cover fees} \\
+    & \fun{feesOK} ~n~\var{pp}~tx~utxo~= \\
+    &~~\fun{range}~(\fun{txinputs_{vf}}~{txb} \restrictdom \var{utxo}) \subseteq \TxOutND ~ \\
+    &~~\wedge~ \fun{ubalance}~(\fun{txinputs_{vf}}~{txb}) \in \Coin \\
+    &~~      \wedge~ \fun{ubalance}~(\fun{txinputs_{vf}}~{txb} \restrictdom \var{utxo}) \geq \txfee{txb} ~ \\
+    &~~      \wedge~ \minfee~n~{pp}~{tx} \leq \txfee{txb} \\
+    &~~      \where \\
+    & ~~~~~~~ \var{txb}~=~\txbody{tx}
+    \nextdef
+    & \fun{getOut} \in \TxOut \to \UTxOOut \\
     & \text{tx outputs transformed to UTxO outputs} \\
     & \fun{getOut} ~{txout}~= \begin{cases}
          \var{txout}  & \text{if~} \var{txout} \in \TxOutND \\
@@ -44,7 +54,7 @@ for paying transaction fees
           \var{ix} \mapsto \var{txout} \in \txouts{txb}
         \right\} \\
     \nextdef
-    & \fun{txins} \in \TxBody \to \powerset{\OutRef} \\
+    & \fun{txins} \in \TxBody \to \powerset{\TxId \times \Ix} \\
     & \text{transaction inputs} \\
     & \fun{txins} ~\var{txb} = \{(txid,ix) \mid ((txid,ix),\wcard)\in\fun{txinputs} ~txb\} \\
   \end{align*}
@@ -64,6 +74,10 @@ The changes due to Plutus integration are as follows:
 
   \item $\fun{adaAll}$ adds up all the Ada in a UTxO and returns it as a
   $\Coin$ value
+
+  \item For Goguen transactions, we have also changed the minimim fee calculation, $\fun{minfee}$,
+  to include the script fees the transaction is obligated to pay to run its
+  scripts.
 
   \item
     The $\fun{ubalance}$ function calculates the (aggregated by currency ID and
@@ -90,22 +104,27 @@ The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Value$.
   %
   \emph{Abstract Functions}
   \begin{align*}
-    & \fun{txscrfee} \in \Prices \to \ExUnits \to \Coin \\
-    & \fun{txscrfee}~ (\var{pr_{init}, pr_{mem}, pr_{steps}})~ (\var{mem, steps})
-    = \var{pr_{init}} + \var{pr_{mem}}*\var{mem} + \var{pr_{steps}}*\var{steps} \\
+    & \fun{txscrfee} \in \N \to \Prices \to \ExUnits \to \Coin \\
+    & \fun{txscrfee}~n~ (\var{pr_{init}, pr_{mem}, pr_{steps}})~ (\var{mem, steps})
+    = \var{pr_{init}}*n + \var{pr_{mem}}*\var{mem} + \var{pr_{steps}}*\var{steps} \\
     & \text{calculates the script fee a transaction must pay} \\
   \end{align*}
   %
   \emph{Helper Functions}
   \begin{align*}
     & \fun{adaAll} \in \UTxO \to \Coin \\
-    & \fun{adaAll}~{\var{utxo}} ~=~\sum_{\{ q \mid \mathsf{adaID}\mapsto
-      (\mathsf{adaToken}\mapsto q) \in \fun{ubalance}~\var{utxo}\}} \fun{co}~q \\
+    & \fun{adaAll}~{\var{utxo}} ~=~\sum_{v \in \fun{ubalance}~\var{utxo} \cap \Coin} v \\
     & \text{sum total of the amount of Ada in all outputs} \\
   \end{align*}
   %
   \emph{Main Calculations}
   \begin{align*}
+    &\fun{minfee} \in \N \to \PParams \to \GoguenTx \to \Coin \\
+    & \text{minimum fee}\\
+    &\fun{minfee}  ~n~\var{pp}~\var{tx} = \\
+    &~~(\fun{a}~\var{pp}) \cdot \fun{txSize}~\var{tx} + (\fun{b}~\var{pp}) +
+    \fun{txscrfee}~n~(\fun{prices}~{pp})~(\fun{txexunits}~(\fun{txbody}~{tx}))
+    \nextdef
     & \fun{ubalance} \in \UTxO \to \Value \\
     & \fun{ubalance} ~ utxo = \sum_{\wcard\mapsto\var{(q,s)}\in~\var{utxo}}
     \fun{getValue}~\var{q} \\
@@ -114,16 +133,15 @@ The $\fun{consumed}$ and $\fun{produced}$ values are compared as $\Value$.
     & \fun{consumed} \in \PParams \to \UTxO \to \StakeCreds \to \Wdrl \to \TxBody \to \Value \\
     & \consumed{pp}{utxo}{stkCreds}{rewards}~{txb} = \\
     & ~~\ubalance{(\txins{txb} \restrictdom \var{utxo})} +
-        \fun{toValue} (\fun{wbalance}~(\fun{txwdrls}~{txb})~\\
-        &~~+~ \keyRefunds{pp}{stkCreds}{txb}) +
+        \fun{wbalance}~(\fun{txwdrls}~{txb})~\\
+        &~~+~ \keyRefunds{pp}{stkCreds}{txb} +
         ~\fun{forge}~\var{txb} \\
     & \text{value consumed} \\
     \nextdef
     & \fun{produced} \in \Slot \to \PParams \to \StakePools \to \TxBody \to \Value \\
     & \fun{produced}~\var{slot}~\var{pp}~\var{stpools}~\var{txb} = \\
-    &~~\ubalance{(\outs{slot}~{txb})}  + \fun{toValue} (\txfee{txb}
-    + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{txb}) \\
-    &~~ + \deposits{pp}{stpools}~{(\txcerts{txb})})\\
+    &~~\ubalance{(\outs{slot}~{txb})}  + \txfee{txb}
+    + \deposits{pp}{stpools}~{(\txcerts{txb})}\\
     & \text{value produced} \\
   \end{align*}
   \caption{Functions used in UTxO rules}
@@ -147,7 +165,7 @@ be
   \item the certificate (only for delegation deregestration $\DCertDeRegKey$,
   as this is the only certificate type that allows script witnesses)
   \item the reward withdrawal $a \to c \in \Wdrl$
-  \item the output reference $\OutRef$ for spending the corresponding output
+  \item the output reference for spending the corresponding output
   (for both the redeemer and the data value)
 \end{itemize}
 
@@ -178,21 +196,26 @@ its inputs. In particular, it returns a validator script together with
     &\fun{indexof} \in \TxIn \to \powerset{\TxIn} \to \Ix\\
     &\fun{indexof} \in \Value \to \Value \to \Ix\\
     & \text{get the index of an item in the an ordered representation} \\
+    \nextdef
   \end{align*}
   %
   \emph{Helper functions}
   \begin{align*}
-    &\fun{indexedScripts} \in \Tx \to (\ScriptHash \mapsto \Script) \\
+    &\fun{indexedScripts} \in \GoguenTx \to (\ScriptHash \mapsto \Script) \\
     & \text{make a finite map of hash-indexed scripts} \\
     &\fun{indexedScripts}~{tx} ~=~ \{ h \mapsto s ~\vert~ \fun{hashScript}~{s}~=~h,
      s\in~\fun{txscripts}~(\fun{txwits}~{tx})\}
     \nextdef
-    &\fun{indexedDats} \in \Tx \to (\DataHash \mapsto \Data)\\
+    &\fun{indexedDats} \in \GoguenTx \to (\DataHash \mapsto \Data)\\
     & \text{make a finite map of hash-indexed data values} \\
     &\fun{indexedDats}~{tx} ~=~ \{ h \mapsto d ~\vert~ \fun{hashData}~{d}~=~h,
      d\in~\fun{txdats}~(\fun{txwits}~{tx})\}
     \nextdef
-    &\fun{findRdmr} \in \Tx \to \CurItem \to \powerset{\Data}\\
+    &\fun{getmdl} \in \Script \PParams \to \CostMod \\
+    & \text{make a finite map of hash-indexed scripts} \\
+    &\fun{getmdl}~{s}~{pp} = \fun{head}~ (\fun{toList}~ (\range ((\fun{language}~{s})\restrictdom(\fun{costmdls}~{pp}))))
+    &\nextdef
+    &\fun{findRdmr} \in \GoguenTx \to \CurItem \to \powerset{\Data}\\
     & \text{get empty set or redeemer corresponding to index} \\
     & \fun{findRdmr}~{tx}~\var{it} ~=~ \{~ r ~\vert~ \\
     &~~(\mathsf{certTag}, \fun{indexof}~\var{it}~(\fun{txcerts}~{txb})) \mapsto ~r \in \fun{txrdmrs}~{txw} \\
@@ -206,9 +229,9 @@ its inputs. In particular, it returns a validator script together with
       & ~~~~~~~ \var{txb}~=~\txbody{tx} \\
       & ~~~~~~~ \var{txw}~=~\fun{txwits}~{tx}
     \nextdef
-    & \fun{mkPLCLst} \to \PParams \to \Tx \to \UTxO \to \seqof{(\ScriptPlutus,\seqof{\Data})} \\
+    & \fun{mkPLCLst} \in \GoguenTx \to \UTxO \to \seqof{(\ScriptPlutus \times \seqof{\Data})} \\
     & \text{a list of all Plutus validators and corresponding input data} \\
-    & \fun{mkPLCLst}  ~\var{pp}~\var{tx}~ \var{utxo} ~=~
+    & \fun{mkPLCLst} ~\var{tx}~ \var{utxo} ~=~
     \fun{toList}~(\fun{allCertScrts}~{utxo}~{tx} \cup \fun{allWDRLSScrts}~{utxo}~{tx} \\
     & ~~ \cup \fun{allInsScrts}~{utxo}~{tx} ~~ \cup \fun{forgedScrts}~{utxo}~{tx}) \\
   \end{align*}
@@ -269,7 +292,7 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allCertScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus \times \seqof{\Data})} \\
+    & \fun{allCertScrts} \in \UTxO \to \GoguenTx \to \powerset{(\ScriptPlutus \times \seqof{\Data})} \\
     & \text{check that all certificate witnessing scripts in a tx validate} \\
     & \fun{allCertScrts}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v}, r;
@@ -281,7 +304,7 @@ fees required.
      \}
     %
     \nextdef
-    & \fun{allWDRLSScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
+    & \fun{allWDRLSScrts} \in \UTxO \to \GoguenTx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
     & \text{check that all reward withdrawal locking scripts in a tx validate} \\
     & \fun{allWDRLSScrts}~{utxo}~{tx}~=~ \\
     & ~~\{ (\var{script_v}, r; \fun{validationData}~\var{utxo}~\var{tx}~
@@ -292,7 +315,7 @@ fees required.
     & ~~ \var{script_v} \in \ScriptPlutus \}
     \nextdef
     %
-    & \fun{forgedScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
+    & \fun{forgedScrts} \in \UTxO \to \GoguenTx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
     & \text{check that all forging scripts in a tx validate} \\
     & \fun{forgedScrts}~{utxo}~{tx}~=~\\
     & ~~\{ (\var{script_v}, r;
@@ -309,7 +332,7 @@ fees required.
 
 \begin{figure}[htb]
   \begin{align*}
-    & \fun{allInsScrts} \in \UTxO \to \Tx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
+    & \fun{allInsScrts} \in \UTxO \to \GoguenTx \to \powerset{(\ScriptPlutus\times\seqof{\Data})} \\
     & \text{check that all UTxO entry locking scripts in a tx validate} \\
     & \fun{allInsScrts}~{utxo}~{tx}~=~ \{ (\var{script_v}; (\var{d};\var{r}; \\
     & ~~ \fun{validationData}~\var{utxo}~\var{tx}~
@@ -355,43 +378,14 @@ scripts and keep track of the execution units being spent as part of its state
 script and the corresponding input data.
 
 \begin{figure}[htb]
-  \emph{Validation environment}
-  \begin{equation*}
-    \ValEnv =
-    \left(
-      \begin{array}{r@{~\in~}lr}
-        \var{slot} & \Slot & \text{current slot}\\
-        \var{pp} & \PParams & \text{protocol parameters}\\
-        \var{stkCreds} & \StakeCredential & \text{stake credential}\\
-        \var{stpools} & \StakePools & \text{stake pool}\\
-        \var{genDelegs} & \KeyHashGen\mapsto\KeyHash & \text{genesis key delegations} \\
-        \var{tx} & \Tx & \text{transaction being processed} \\
-      \end{array}
-    \right)
-  \end{equation*}
-  %
-  \emph{Validation state}
-  \begin{equation*}
-    \ValState =
-    \left(
-      \begin{array}{r@{~\in~}lr}
-        \var{utxo} & \UTxO & \text{UTxO}\\
-        \var{deposits} & \Value & \text{deposits pot}\\
-        \var{fees} & \Value & \text{fee pot}\\
-        \var{ups} & \UpdateState & \text{update state}\\
-        \var{remExU} & \ExUnits & \text{exunits remaining to spend on validation} \\
-      \end{array}
-    \right)
-  \end{equation*}
-  %
-  \emph{Script transitions}
+  \emph{State transitions}
   \begin{equation*}
     \_ \vdash
     \var{\_} \trans{utxos}{\_} \var{\_}
-    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{(\ScriptPlutus\times\seqof{\Data})} \times \ValState)
+    \subseteq \powerset (\UTxOEnv \times \UTxOState \times \Tx \times \UTxOState)
   \end{equation*}
   %
-  \caption{UTxO script validation types}
+  \caption{UTxO state update types}
   \label{fig:ts-types:utxo-scripts}
 \end{figure}
 
@@ -472,15 +466,176 @@ We also rely on correct use of tags in other rules (at this time, only in
 the rules in Figure \ref{fig:rules:ledger}).
 
 \begin{figure}[htb]
+  \emph{Validation environment}
+  \begin{equation*}
+    \ValEnv =
+    \left(
+      \begin{array}{r@{~\in~}lr}
+        \var{pp} & \PParams & \text{protocol parameters}\\
+        \var{tx} & \GoguenTx & \text{transaction being processed} \\
+      \end{array}
+    \right)
+  \end{equation*}
+  %
+  \emph{Validation state}
+  \begin{equation*}
+    \ValState =
+    \left(
+      \begin{array}{r@{~\in~}lr}
+        \var{remExU} & \ExUnits & \text{exunits remaining to spend on validation} \\
+      \end{array}
+    \right)
+  \end{equation*}
+  %
+  \emph{Script transitions}
+  \begin{equation*}
+    \_ \vdash
+    \var{\_} \trans{utxos}{\_} \var{\_}
+    \subseteq \powerset (\ValEnv \times \ValState \times \seqof{(\ScriptPlutus\times\seqof{\Data})} \times \ValState)
+  \end{equation*}
+  %
+  \caption{UTxO script validation types}
+  \label{fig:ts-types:utxos}
+\end{figure}
+
+\begin{figure}[htb]
   \begin{equation}
     \inference[Scripts-Val]
     {
-    \var{txb}\leteq\txbody{tx} \\
     \fun{txvaltag}~\var{tx} \in \Yes  &
     \var{remExU}~\geq~0
+    }
+    {
+    \begin{array}{l}
+      \var{pp}\\
+      \var{tx}\\
+    \end{array}
+      \vdash
+      \left(
+      \begin{array}{r}
+        \var{remExU}\\
+      \end{array}
+      \right)
+      \trans{sval}{\epsilon}
+      \left(
+      \begin{array}{r}
+        \var{remExU}\\
+      \end{array}
+      \right) \\
+    }
+  \end{equation}
+  \begin{equation}
+    \inference[Scripts-Stop]
+    { \\~\\
+    (\var{isVal},\var{remExU'})~:=~ \llbracket \fun{fst}~{s} \rrbracket_
+    {\fun{getmdl}~(\fun{fst}~{s})~\var{pp},\var{remExU}} (\fun{snd}~{s})
     \\
     ~
     \\
+    \fun{txvaltag}~\var{tx} \in \Nope &
+    (\var{remExU'}~<~0 ~ \lor ~ \var{isVal}\in \Nope)
+    }
+    {
+    \begin{array}{l}
+      \var{pp}\\
+      \var{tx}\\
+    \end{array}
+      \vdash
+      \left(
+      \begin{array}{r}
+        \var{remExU}\\
+      \end{array}
+      \right)
+      \trans{sval}{\Gamma;s}
+      \left(
+      \begin{array}{r}
+        \var{remExU}\\
+      \end{array}
+      \right)
+    }
+  \end{equation}
+  \begin{equation}
+    \inference[Scripts-Ind]
+    { \\~\\
+    (\var{isVal},\var{remExU''})~:=~ \llbracket \fun{fst}~{s} \rrbracket
+    _{\fun{getmdl}~(\fun{fst}~{s})~\var{pp},\var{remExU'}} (\fun{snd}~{s})
+    \\
+    ~
+    \\
+    (\var{remExU''}~\geq~0 ~ \wedge ~ \var{isVal}\in \Yes)
+    \\
+    ~
+    \\
+    {
+    \begin{array}{l}
+      \var{pp}\\
+      \var{tx}\\
+    \end{array}
+    }
+      \vdash
+      \left(
+      {
+      \begin{array}{r}
+        \var{remExU}\\
+      \end{array}
+      }
+      \right)
+      \trans{sval}{\Gamma}
+      \left(
+      {
+      \begin{array}{r}
+        \var{remExU'}\\
+      \end{array}
+      }
+      \right)
+    }
+    {
+    \begin{array}{l}
+      \var{pp}\\
+      \var{tx}\\
+    \end{array}
+      \vdash
+      \left(
+      \begin{array}{r}
+        \var{remExU}\\
+      \end{array}
+      \right)
+      \trans{sval}{\Gamma;s}
+      \left(
+      \begin{array}{r}
+        \varUpdate{remExU''}\\
+      \end{array}
+      \right)
+    }
+  \end{equation}
+  \caption{Script validation rules}
+  \label{fig:rules:utxo-scrval}
+\end{figure}
+
+
+\begin{figure}[htb]
+  \begin{equation}
+    \inference[Scripts-Yes]
+    {
+    \var{txb}\leteq\txbody{tx} &
+    \fun{txvaltag}~\var{tx} \in \Yes
+    \\
+    ~
+    \\
+    \var{sLst} := \fun{mkPLCLst}~\var{tx}~\var{utxo}
+    \\~\\
+    {
+      \left(
+        \begin{array}{r}
+          \var{pp} \\
+          \var{tx} \\
+        \end{array}
+      \right)
+    }
+      \vdash
+        \var{\fun{txexunits}~{tx}}
+      \trans{sval}{sLst}\var{remExU}
+      \\~\\
     {
       \left(
         \begin{array}{r}
@@ -506,7 +661,6 @@ the rules in Figure \ref{fig:rules:ledger}).
       \var{stkCreds}\\
       \var{stpools}\\
       \var{genDelegs}\\
-      \var{tx}\\
     \end{array}
       \vdash
       \left(
@@ -515,32 +669,40 @@ the rules in Figure \ref{fig:rules:ledger}).
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remExU}\\
       \end{array}
       \right)
-      \trans{utxos}{\epsilon}
+      \trans{utxos}{tx}
       \left(
       \begin{array}{r}
         \varUpdate{\var{(\txins{txb} \subtractdom \var{utxo}) \cup \outs{slot}~{txb}}}  \\
         \varUpdate{\var{deposits} + \var{depositChange}} \\
         \varUpdate{\var{fees} + \txfee{txb} + \var{decayed}} \\
         \varUpdate{\var{ups'}} \\
-        \var{remExU}\\
       \end{array}
       \right) \\
     }
   \end{equation}
   \begin{equation}
-    \inference[Scripts-Stop]
+    \inference[Scripts-No]
     {
-    \var{txb}\leteq\txbody{tx} \\
-    (\var{isVal},\var{remExU'})~:=~ \llbracket \fun{fst}~{s} \rrbracket_
-    {\fun{costm}~\var{pp},\var{remExU}} (\fun{snd}~{s})
+    \var{txb}\leteq\txbody{tx} &
+    \fun{txvaltag}~\var{tx} \in \Nope
     \\
     ~
     \\
-    \fun{txvaltag}~\var{tx} \in \Nope &
-    (\var{remExU'}~<~0 ~ \lor ~ \var{isVal}\in \Nope)
+    \var{sLst} := \fun{mkPLCLst}~\var{tx}~\var{utxo}
+    \\~\\
+    {
+      \left(
+        \begin{array}{r}
+          \var{pp} \\
+          \var{tx} \\
+        \end{array}
+      \right)
+    }
+      \vdash
+        \var{\fun{txexunits}~{tx}}
+      \trans{sval}{sLst}\var{remExU}
     }
     {
     \begin{array}{l}
@@ -549,7 +711,6 @@ the rules in Figure \ref{fig:rules:ledger}).
       \var{stkCreds}\\
       \var{stpools}\\
       \var{genDelegs}\\
-      \var{tx}\\
     \end{array}
       \vdash
       \left(
@@ -558,102 +719,23 @@ the rules in Figure \ref{fig:rules:ledger}).
         \var{deposits} \\
         \var{fees} \\
         \var{ups} \\
-        \var{remExU}\\
       \end{array}
       \right)
-      \trans{utxos}{s;\Gamma}
+      \trans{utxos}{tx}
       \left(
       \begin{array}{r}
         \varUpdate{\var{\fun{txinputs_{vf}}~{txb} \subtractdom \var{utxo}}}  \\
         \var{deposits} \\
         \varUpdate{\var{fees} + \fun{ubalance}~(\fun{txinputs_{vf}}~{txb}\restrictdom \var{utxo})} \\
         \var{ups} \\
-        \var{remExU}\\
       \end{array}
       \right)
     }
   \end{equation}
-  \begin{equation}
-    \inference[Scripts-Ind]
-    {
-    (\var{isVal},\var{remExU''})~:=~ \llbracket \fun{fst}~{s} \rrbracket
-    _{\fun{costm}~\var{pp},\var{remExU'}} (\fun{snd}~{s})
-    \\
-    ~
-    \\
-    (\var{remExU''}~\geq~0 ~ \wedge ~ \var{isVal}\in \Yes)
-    \\
-    ~
-    \\
-    {
-    \begin{array}{l}
-      \var{slot}\\
-      \var{pp}\\
-      \var{stkCreds}\\
-      \var{stpools}\\
-      \var{genDelegs}\\
-      \var{tx}\\
-    \end{array}
-    }
-      \vdash
-      \left(
-      {
-      \begin{array}{r}
-        \var{utxo} \\
-        \var{deposits} \\
-        \var{fees} \\
-        \var{ups} \\
-        \var{remExU}\\
-      \end{array}
-      }
-      \right)
-      \trans{utxos}{\Gamma}
-      \left(
-      {
-      \begin{array}{r}
-        \var{utxo} \\
-        \var{deposits} \\
-        \var{fees} \\
-        \var{ups} \\
-        \var{remExU'}\\
-      \end{array}
-      }
-      \right)
-    }
-    {
-    \begin{array}{l}
-      \var{slot}\\
-      \var{pp}\\
-      \var{stkCreds}\\
-      \var{stpools}\\
-      \var{genDelegs}\\
-      \var{tx}\\
-    \end{array}
-      \vdash
-      \left(
-      \begin{array}{r}
-        \var{utxo} \\
-        \var{deposits} \\
-        \var{fees} \\
-        \var{ups} \\
-        \var{remExU}\\
-      \end{array}
-      \right)
-      \trans{utxos}{\Gamma;s}
-      \left(
-      \begin{array}{r}
-        \var{utxo} \\
-        \var{deposits} \\
-        \var{fees} \\
-        \var{ups} \\
-        \varUpdate{remExU''}\\
-      \end{array}
-      \right)
-    }
-  \end{equation}
-  \caption{Script validation inference rules}
-  \label{fig:rules:utxo-scrval}
+  \caption{State update rules}
+  \label{fig:rules:utxo-state-upd}
 \end{figure}
+
 
 In Figure \ref{fig:rules:utxo-shelley}, we present the $\type{UTxO-inductive}$
 transition rule. This is the rule where all the phase 1 validation occurs
@@ -732,42 +814,22 @@ from the original Shelley spec):
     {
       \var{txb}\leteq\txbody{tx} &
       \var{txw}\leteq\fun{txwits}~{tx} \\
-      \fun{txlst}~txb \leq \var{slot}
+      \fun{txfst}~txb \leq \var{slot}
       & \fun{txttl}~txb \geq \var{slot}
       \\
       \txins{txb} \neq \emptyset
       & \txins{txb} \subseteq \dom \var{utxo}
       \\
-      \fun{range}~(\fun{txinputs_{vf}}~{txb} \restrictdom \var{utxo})
-      \subseteq \TxOutND \\
       \consumed{pp}{utxo}{stkCreds}{rewards}~{txb} = \produced{slot}~{pp}~{stpools}~{txb}
       \\~\\
-      \mathsf{adaID}\restrictdom \fun{forge}~{txb} = \epsilon
+      \fun{feesOK}~(\vert~ \fun{txscripts}~{tx} \cap \ScriptPlutus ~\vert) ~pp~tx~utxo \\
       \\
       ~
       \\
-      \fun{dom}(\fun{ubalance}~(\fun{txinputs_{vf}}~{txb} \restrictdom \var{utxo})) = \mathsf{adaID} \\
-      \fun{ubalance}~(\fun{txinputs_{vf}}~{txb} \restrictdom \var{utxo}) \geq
-      \fun{toValue} ( \txfee{txb}
-      + \fun{txscrfee}~(\fun{prices}~{pp})~(\fun{txexunits}~{txb}) ) \\
-      \minfee{pp}{tx} \leq \txfee{txb}
+      \forall txout \in \txouts{txb}, ~ \fun{getValue}~txout\}  ~\geq ~ \epsilon \\~
       \\
-      ~
-      \\
-      \forall txout \in \txouts{txb}, q~ \in~ \{~q~\vert~ c\mapsto (t\mapsto q) \in \fun{getValue}~txout\} \\
-      \Rightarrow q ~\geq ~0 \\
-      \forall \mathsf{adaID}\mapsto{tkns} \in \txouts{txb},
-      \fun{dom}~\var{tkns} = \{\mathsf{adaToken}\}
-      \\
-      \fun{txsize}~{tx}\leq\fun{maxTxSize}~\var{pp}
-      \\
-      ~
-      \\
+      \fun{txsize}~{tx}\leq\fun{maxTxSize}~\var{pp} \\
       \fun{txexunits}~{txb} \leq \fun{maxTxExUnits}~{pp}
-      \\
-      ~
-      \\
-      \var{sLst} := \fun{mkPLCLst}~\var{tx}~\var{utxo}
       \\
       ~
       \\
@@ -778,7 +840,6 @@ from the original Shelley spec):
           \var{stkCreds}\\
           \var{stpools}\\
           \var{genDelegs}\\
-          \var{tx}\\
         \end{array}
       }
       \vdash
@@ -789,11 +850,10 @@ from the original Shelley spec):
             \var{deposits} \\
             \var{fees} \\
             \var{ups}\\
-            \var{\fun{txexunits}~{tx}}\\
           \end{array}
         \right)
       }
-      \trans{utxos}{\var{sLst}}
+      \trans{utxos}{\var{tx}}
       {
         \left(
           \begin{array}{r}
@@ -801,7 +861,6 @@ from the original Shelley spec):
             \var{deposits'} \\
             \var{fees'} \\
             \var{ups'}\\
-            \var{remExU}\\
           \end{array}
         \right)
       }
@@ -855,7 +914,7 @@ part of witnessing.
 
 \begin{figure}[htb]
   \begin{align*}
-      & \hspace{-1cm}\fun{scriptsNeeded} \in \UTxO \to \Tx \to
+      & \hspace{-1cm}\fun{scriptsNeeded} \in \UTxO \to \GoguenTx \to
         (\CurItem \mapsto \ScriptHash)\\
       & \hspace{-1cm}\text{items that need script validation and corresponding script hashes} \\
       &  \hspace{-1cm}\fun{scriptsNeeded}~\var{utxo}~\var{tx} = \\
@@ -863,7 +922,7 @@ part of witnessing.
       & ~~~~~i\in\fun{txinsScript}~{(\fun{txinputs}~\var{txb})}~{utxo}\} \\
       \cup & ~~\{ (a\mapsto c) \mapsto \fun{stakeCred_{r}}~\var{a} \mid a \mapsto c \in \fun{txwdrls}~\var{txb}),
          a\in \AddrRWDScr \} \\
-        \cup & ~~\{ cert \mapsto a \mid a \in\AddrScr \cap \fun{certWitsNeeded}~{txb}\} \\
+        \cup & ~~\{ cert \mapsto a \mid a \in\ScriptHash \cap \fun{certWitsNeeded}~{txb}\} \\
         \cup & ~~\{ (cid \mapsto \var{tkns}) \mapsto \var{cid} \mid cid \mapsto \var{tkns}~\in~\fun{forge}~{txb} \} \\
       & \where \\
       & ~~~~~~~ \var{txb}~=~\txbody{tx} \\
@@ -874,14 +933,16 @@ part of witnessing.
 \end{figure}
 
 Anything having to do with multisig scripts is checked in the UTXOW rule.
+{fig:rules:utxow-goguen}
 
 \begin{figure}
   \begin{equation}
-    \label{eq:utxo-witness-inductive-shelley}
-    \inference[UTxO-wit]
+    \label{eq:utxo-witness-inductive-goguen}
+    \inference[UTxO-witG]
     {
       \var{txb}\leteq\txbody{tx} &
-      \var{txw}\leteq\fun{txwits}~{tx} \\
+      \var{txw}\leteq\fun{txwits}~{tx} &
+      \var{tx}~\in~\GoguenTx \\
       (utxo, \wcard, \wcard, \wcard) \leteq \var{utxoSt} \\
       \var{witsKeyHashes} \leteq \{\fun{hashKey}~\var{vk} \vert \var{vk} \in
       \dom (\txwitsVKey{txw}) \}\\~\\
@@ -889,27 +950,27 @@ Anything having to do with multisig scripts is checked in the UTXOW rule.
       \fun{runMSigScript}~\var{validator}~\var{tx}\\~\\
       \range~(\fun{scriptsNeeded}~\var{utxo}~\var{tx}) ~=~ \dom (\fun{indexedScripts}~{tx}) \\
       \forall c\mapsto h \in ~\fun{scriptsNeeded}~\var{utxo}~\var{tx}, ~h\mapsto s~\in~\fun{indexedScripts}~{tx},\\
-       s \in \ScriptPlutus~\Rightarrow~\fun{findRdmr}~{tx}~{c}\neq \{\}
+       s \in \ScriptPlutus~\Leftrightarrow ~\fun{findRdmr}~{tx}~{c}\neq \emptyset
       \\~\\
-      \forall \var{cert}~\in~\fun{txcerts}~{txb}, \fun{regCred}~{cert}\in \ScriptHash \Rightarrow \\
-      \var{cert} \in~ \DCertDeRegKey
+      \forall \var{cert}~\in~\fun{txcerts}~{txb}, \fun{regCred}~{cert}\in \ScriptHash \Leftrightarrow
+      \var{cert} \in~ \DCertDeRegKey \\~\\
       \forall~\var{txin}\in\fun{txinputs}~{txb},
       \var{txin} \mapsto \var{(\wcard,\wcard,h_d)} \in \var{utxo},
-      \var{h_d} \in \fun{dom}(\fun{indexedDats}~{txw})
+      \var{h_d} ~\in \fun{dom}(\fun{indexedDats}~{txw})
       \\
       ~
       \\
-      \forall~ix \mapsto (a,v,d_h,\var{hdv}) ~\in~\fun{txouts}~{txb}, \\
-      \var{hdv}~ = ~\Yes~ \Rightarrow \var{d_h}\in \fun{dom}~ (\fun{indexedDats}~{txw})
+      \forall~ix \mapsto (a,v,d_h,\Yes) ~\in~\fun{txouts}~{txb}, \\
+       \var{d_h}\in \fun{dom}~ (\fun{indexedDats}~{txw})
       \\
       ~
       \\
       \fun{cmlangs}~(\fun{txscripts}~\var{txw}) \subseteq \fun{dom}~(\fun{costmdls}~{pp}) \\
-      \fun{cmlangs}~(\fun{txscripts}~\var{txw}) ~=~ \{\} \Rightarrow \fun{ppHash}~{txb}~=~\Nothing \\ \fun{cmlangs}~(\fun{txscripts}~\var{txw}) \neq \{\} \Rightarrow \\
+      \fun{cmlangs}~(\fun{txscripts}~\var{txw}) ~=~ \emptyset \Leftrightarrow \fun{ppHash}~{txb}~=~\Nothing \\ \fun{cmlangs}~(\fun{txscripts}~\var{txw}) \neq \emptyset \Leftrightarrow \\
       \fun{hashLanguagePP}~\var{pp}~(\fun{cmlangs}~(\fun{txscripts}~\var{txw})) =  \fun{ppHash}~{txb} \\~\\
-      \fun{txdats}~\var{txw} ~=~ \{\} \Rightarrow \fun{rdmrsHash}~{txb}~=~\Nothing \\
-      \fun{txdats}~\var{txw} ~\neq~ \{\} \Rightarrow
-      \fun{hash}~(\fun{txdats}~\var{txw})~ =~  \fun{rdmrsHash}~{txb} \\
+      \fun{txrdmrs}~\var{txw} ~=~ \emptyset \Leftrightarrow \fun{rdmrsHash}~{txb}~=~\Nothing \\
+      \fun{txrdmrs}~\var{txw} ~\neq~ \emptyset \Leftrightarrow
+      \fun{hash}~(\fun{txrdmrs}~\var{txw})~ =~  \fun{rdmrsHash}~{txb} \\
       \\~\\
       \forall \var{vk} \mapsto \sigma \in \txwitsVKey{txw},
       \mathcal{V}_{\var{vk}}{\serialised{\txbody{tx}}}_{\sigma} \\
@@ -958,7 +1019,75 @@ Anything having to do with multisig scripts is checked in the UTXOW rule.
       \vdash \var{utxoSt} \trans{utxow}{tx} \varUpdate{\var{utxoSt'}}
     }
   \end{equation}
-  \caption{UTxO with witnesses inference rules}
+  \caption{UTxO with witnesses inference rules for GoguenTx}
+  \label{fig:rules:utxow-goguen}
+\end{figure}
+
+\begin{figure}
+  \begin{equation}
+    \label{eq:utxo-witness-inductive-shelley}
+    \inference[UTxO-witS]
+    {
+      \var{txb}\leteq\txbody{tx} &
+      \var{txw}\leteq\fun{txwits}~{tx} &
+       \var{tx}~\in~\ShelleyTx \\~\\
+      (utxo, \wcard, \wcard, \wcard) \leteq \var{utxoSt} \\
+      \var{witsKeyHashes} \leteq \{\fun{hashKey}~\var{vk} \vert \var{vk} \in
+      \dom (\txwitsVKey{txw}) \}\\~\\
+      \forall \var{hs} \mapsto \var{validator} \in \fun{txwitsScript}~{txw},\\
+      \fun{hashScript}~\var{validator} = \var{hs} \wedge
+      \fun{validateScript}~\var{validator}~\var{tx}\\~\\
+      \fun{scriptsNeeded}~\var{utxo}~\var{tx} = \dom (\fun{txwitsScript}~{txw})
+      \\~\\
+      \forall \var{vk} \mapsto \sigma \in \txwitsVKey{txw},
+      \mathcal{V}_{\var{vk}}{\serialised{\txbody{tx}}}_{\sigma} \\
+      \fun{witsVKeyNeeded}~{utxo}~{tx}~{genDelegs} \subseteq witsKeyHashes
+      \\~\\
+      genSig \leteq
+      \left\{
+        \fun{hashKey}~gkey \vert gkey \in\dom{genDelegs}
+      \right\}
+      \cap
+      \var{witsKeyHashes}
+      \\
+      \left\{
+        c\in\txcerts{txb}~\cap\DCertMir
+      \right\} \neq\emptyset \implies \vert genSig\vert \geq \Quorum \wedge
+      \fun{d}~\var{pp} > 0
+      \\~\\
+      \var{mdh}\leteq\fun{txMDhash}~\var{txb}
+      &
+      \var{md}\leteq\fun{txMD}~\var{tx}
+      \\
+      (\var{mdh}=\Nothing \land \var{md}=\Nothing)
+      \lor
+      (\var{mdh}=\fun{hashMD}~\var{md})
+      \\~\\
+      \var{txg}~\leteq~\fun{toGoguenTx}~{tx} \\~\\
+      {
+        \begin{array}{r}
+          \var{slot}\\
+          \var{pp}\\
+          \var{stkCreds}\\
+          \var{stpools}\\
+          \var{genDelegs}\\
+        \end{array}
+      }
+      \vdash \var{utxoSt} \trans{\hyperref[fig:rules:utxo-shelley]{utxo}}{txg}
+      \var{utxoSt'}\\
+    }
+    {
+      \begin{array}{r}
+        \var{slot}\\
+        \var{pp}\\
+        \var{stkCreds}\\
+        \var{stpools}\\
+        \var{genDelegs}\\
+      \end{array}
+      \vdash \var{utxoSt} \trans{utxow}{tx} \varUpdate{\var{utxoSt'}}
+    }
+  \end{equation}
+  \caption{UTxO with witnesses inference rules for ShelleyTx}
   \label{fig:rules:utxow-shelley}
 \end{figure}
 
