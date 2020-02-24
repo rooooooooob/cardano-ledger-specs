@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -54,7 +55,7 @@ import           MetaData (MetaData)
 import           Numeric.Natural (Natural)
 
 import           BaseTypes (Nonce (..), Seed (..), UnitInterval, intervalValue, mkNonce)
-import           Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR), decodeListLen, encodeListLen,
+import           Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR), decodeListLen, encodeListLen, serializeEncoding',
                      matchSize)
 import           Cardano.Crypto.Hash (SHA256)
 import qualified Cardano.Crypto.Hash.Class as Hash
@@ -70,7 +71,7 @@ import           Slot (BlockNo (..), SlotNo (..))
 import           Tx (Tx (..), cborWitsToTx, txToCBORWits)
 
 import           NonIntegral ((***))
-import           Serialization (CBORGroup (..), CBORMap (..), CborSeq (..), FromCBORGroup (..),
+import           Serialization (CBORGroup (..), CBORMap (..), CborSeq (..), FromCBORGroup (..), FromCBORAnnotatedGroup (..), liftAnn,
                      ToCBORGroup (..))
 
 -- |The hash of a Block Header
@@ -100,7 +101,7 @@ bhHash
   :: Crypto crypto
   => BHeader crypto
   -> HashHeader crypto
-bhHash = HashHeader . hash
+bhHash = HashHeader . Hash.hashWithSerialiser toCBORGroup
 
 -- |Hash a given block body
 bbHash
