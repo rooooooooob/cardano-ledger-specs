@@ -89,5 +89,5 @@ rankedPools nes slotsPerEpoch = rankings
         , desirability pp r n totalBlocks pool pstake total)
       | (hk, (pool, n, pstake)) <- pdata
       ]
-    total = Map.foldl (+) (Coin 0) stake'
+    total = sum stake'
     totalBlocks = sum b
