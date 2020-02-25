@@ -51,7 +51,7 @@ desirability pp r blocksN blocksTotal pool (Stake stake) (Coin total) =
     pBar = if intervalValue (_d pp) < 0.8 && sigma > 0
              then beta / sigma
              else 1
-    Coin pstake = Map.foldl (+) (Coin 0) stake
+    Coin pstake = sum stake
     sigma = fromIntegral pstake % tot
     beta = fromIntegral blocksN / fromIntegral (max 1 blocksTotal)
 
