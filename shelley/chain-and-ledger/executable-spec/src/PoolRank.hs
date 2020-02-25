@@ -48,9 +48,11 @@ desirability pp r blocksN blocksTotal pool (Stake stake) (Coin total) =
     a0 = _a0 pp
     z0 = 1 % max 1 (fromIntegral (_nOpt pp))
 
-    pBar = if intervalValue (_d pp) < 0.8 && sigma > 0
+    pBar = if sigma == 0
+             then 0
+           else if intervalValue (_d pp) < 0.8
              then beta / sigma
-             else 1
+           else 1
     Coin pstake = sum stake
     sigma = fromIntegral pstake % tot
     beta = fromIntegral blocksN / fromIntegral (max 1 blocksTotal)

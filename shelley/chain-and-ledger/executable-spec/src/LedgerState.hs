@@ -963,9 +963,12 @@ poolRewards d_ sigma blocksN blocksTotal (Coin maxP) =
   floor (pBar * fromIntegral maxP)
   where
     beta = fromIntegral blocksN / fromIntegral (max 1 blocksTotal)
-    pBar = if intervalValue d_ < 0.8
-             then beta / intervalValue sigma
-             else 1
+    sigma' = intervalValue sigma
+    pBar = if sigma' == 0
+             then 0
+           else if intervalValue d_ < 0.8
+             then beta / sigma'
+           else 1
 
 -- | Calculate pool leader reward
 leaderRew
