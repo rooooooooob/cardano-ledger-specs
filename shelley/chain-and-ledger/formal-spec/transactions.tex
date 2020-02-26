@@ -40,7 +40,8 @@ except for the following changes and additions:
   $\mathsf{certTag}$  is for validating certificates with script credentials  \\
   $\mathsf{wdrlTag}$ is for validating reward withdrawals from (Plutus) script addresses
 
-  \item $\Script$ is a sum type for all types of scripts
+  \item $\Script$ is a sum type for all types of scripts, currently only
+  Plutus V1 and multisig
 
   \item $\IsValidating$ is a tag that indicates when a transaction is
   expected to have all the non-native scripts (currently this means only
@@ -74,7 +75,7 @@ except for the following changes and additions:
   to either be processed full, or do nothing but pay fees for script
   validation (in the case of script validation failure, see Section
   \ref{sec:utxo} for details). All inputs can be marked as for-fees in
-  the name of privacy concerns.
+  the name of privacy concerns (if a user so chooses).
 
   \item $\HasDV$: This is a tag used to indicate whether the transaction carrying
   the output the tag is attached to also contains the full datavalue corresponding
@@ -283,15 +284,12 @@ are two possibilities here:
   is needed).
 
   For redeemers, we use a reverse pointer approach. Instead of pairing
-  a pointer (to the correct redeemer) with the item that redeemer is needed for
-  , we pair the redeemer with a pointer to the item for
+  a pointer (to the correct redeemer) with the item that redeemer is needed for,
+  we index the redeemer by the pointer to the item for
   which it will be used. This pointer is the key in the indexed redeemer structure.
-
-  Recall that this pointer is  together with the item that requires a redeemer for validation,
-  we put  redeemer structure is indexed by a pair of a tag indicating the type of
+  This pointer is a pair of a tag indicating the type of
   thing being validated, and an index of it in the structure (list, set, or map)
-  where it is stored. This is a reverse-pointer indexing approach.
-
+  where it is stored.
 \end{itemize}
 
 \textbf{Body of the Transaction.}
@@ -359,24 +357,8 @@ With this body structure, like in the basic UTxO case, a change in the body of t
 will make the transaction completely invalid, rather than cause the fee-paying script validation
 failure or change the amount of fees it pays.
 
-\textbf{Processing Shelley Txs in the Goguen Era Transactions.}
-Everything we have discussed so far in this section outlines the differences between Shelley era
-and Goguen era transactions, which have different types. We refer to the Shelley
-trasaction type as $\ShelleyTx$ and $\GoguenTx$ is the Goguen transaction.
-For all other overlapping names of types used in both the Shelley and the Goguen
-specifications, in this document, the names we use refer to the Goguen types only.
-We later (in Section~\ref{sec:chain}) make a distinction between the Shelley and
-Goguen chain states, as well as UTxOs, where we make the names explicit.
-
-The reason we must make the distinction between the transaction types explicit from here onwards
-is that in the Goguen era, we will be able to process both types of transactions
-to make the transition from one era to the next smoother and less restrictive.
-Shelley transactions have less data than the Goguen ones, so we can interpret
-a Shelley transaction as a Goguen one. A crucial part of a Shelley transaction,
-however, that cannot be transformed is the collection of signatures.
-
-We will specify how we verify signatures before transforming and processing
-a Shelley transction in the Goguen format when we discuss witnessing.
+\textbf{GoguenTx}
+Finally, the complete Goguen transaction is made up of:
 
 \begin{itemize}
   \item the transaction body
@@ -391,6 +373,25 @@ a Shelley transction in the Goguen format when we discuss witnessing.
   \item transaction metadata
 \end{itemize}
 
+\textbf{Processing Shelley Transactions in the Goguen Era.}
+Everything we have discussed so far in this document is about the structure and data
+in Goguen era protocol parameters and transactions. Some type names are reinterpreted
+for different purposes in the Goguen era than they were used for in Shelley, and
+we specify the differences in these cases.
+
+To make the transition from one era to the next smoother and less restrictive,
+in the Goguen era, we will be able to process both transaction formats.
+For this reason, we refer to the Shelley
+trasaction type as $\ShelleyTx$, and $\GoguenTx$ is the new style Goguen transaction.
+A true Goguen transaction is really of either type,
+i.e. $\ShelleyTx \uniondistinct \GoguenTx$.
+
+Shelley transactions have less data than the Goguen ones, so we can interpret
+a Shelley transaction as a Goguen one and process it using Goguen ledger
+rules. A crucial part of a Shelley transaction,
+however, that cannot be transformed, is the witnesses.
+We will specify how to verify signatures before transforming and processing
+the rest of a Shelley transction in the Goguen format when we discuss witnessing.
 
 \begin{figure*}[htb]
   \emph{Transaction Types}
@@ -435,7 +436,7 @@ a Shelley transction in the Goguen format when we discuss witnessing.
   %
   \begin{equation*}
     \begin{array}{r@{~\in~}l@{\qquad=\qquad}lr}
-      \var{tx} & \Tx & \ShelleyTx \uniondistinct \GoguenTx 
+      \var{tx} & \Tx & \ShelleyTx \uniondistinct \GoguenTx
       \text{a Shelley or Goguen transaction}\\
     \end{array}
   \end{equation*}
@@ -455,12 +456,18 @@ a Shelley transction in the Goguen format when we discuss witnessing.
 \end{figure*}
 
 \textbf{Protocol Parameter Hash Comparison Considerations.}
-Given a set of
-scripts, the function $\fun{cmlangs}$ returns a set of the languages that
-require cost models to run the scripts,
-see Figure \ref{fig:defs:functions-chain-helper}. To compute the
-hash of the current parameters in the chain state,
-(only the ones relevant to all those versions are selected and hashed by $\fun{hashLanguagePP}$.
+Recall that to ensure deterministic script validation outcome, we must include
+a hash of certain on-chain data (currently, only some protocol parameters)
+inside the body of the transaction. This hash is accessed by $\fun{ppHash}$.
+We must also compute the hash of a subset of the actual current protocol parameter values,
+and compare it to the hash inside the transaction.
+
+To select the relevant protocol parameters to hash, we have defined two helper
+functions (see Figure \ref{fig:defs:functions-chain-helper}). The first
+is an accessor function that returns the language tag of a given script, $\fun{language}$.
+The second is $\fun{cmlangs}$, which, given a set of scripts, returns the set
+of language tags of scripts whose languages have a corresponding cost model.
+We will use these in the rules we present later to make the hashes comparison.
 
 Note that at this time, only data from the protocol parameters must be hashed
 for the comparison we defined. For future Plutus versions, parts of the ledger
@@ -473,9 +480,9 @@ will fail.
 
 In the future, additional functionality may be supported by the ledger that
 allows a sequence of transactions built over a period of time to be put on-chain
-as a single transaction. Over this period of time, the parameter or ledger
+as a single transaction. Over this period of time, the parameters or ledger
 data that must be passed as an argument to script interpreters could have changed.
-The resulting transaction to be put on the chain (that contains the whole sequence of
+As a result, this pending transaction (that contains the whole sequence of
 transactions) is still obligated to include the hash of the current parameters
 and any additional script processing fees.
 
@@ -515,7 +522,7 @@ about this representation:
   \item the representation of Ada is unique
   \item the conversion of the $\Coin$ type to $\Value$ - it is implicit that
   the $\Value$ representation of Ada includes the special case for $\Coin$, and
-  terms of these two types can be added or subtracted
+  terms of these two types can be added or subtracted as terms of type $\Value$
   \item all Ada tokens are fungible with other Ada tokens (recall that this is
   not the case of all tokens a currency that is not Ada)
   \item there is no way to forge Ada tokens, as it it has a special representation
@@ -541,7 +548,7 @@ are presented.
   correct conversion of the quantity of resource primitives the script validation
   computation used into $\ExUnits$. T
   \item
-  a list of three terms of type $\Data$ (the data-value, redeemer,
+  a list of (at most three) terms of type $\Data$ (the data-value, redeemer,
   and the PendingTx).
   \item the execution units budget (the maximum $\var{exunits}$
   the validation is allowed to use)
@@ -552,6 +559,17 @@ are presented.
   units budget has been spent before the validation is complete.
 \end{itemize}
 
+\begin{note}
+  \textbf{Know your contract arguments}
+A Plutus validator script may receive either a list of three terms of type $\Data$,
+such as for output locking scripts, or two terms (redeemer and PendingTx, with
+no datavalue), such as in the rest of the Plutus scripts. If redeemers
+are optional, sometimes only the PendingTx will be passed to the validator.
+Contract authors must keep this in mind when writing contracts, as there is
+only one function (per Plutus version) to interface with the Plutus interpreter,
+that runs every kind of Plutus script - with no knowledge of what $\Data$ arguments 
+are passed to it via this list.
+\end{note}
 
 \begin{figure*}[htb]
   \emph{Abstract Script Validation Functions}

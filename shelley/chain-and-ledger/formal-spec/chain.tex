@@ -117,9 +117,19 @@ refer to Shelley-era protocol parameter type as $\ShelleyPParams$, and the Gogue
 type as $\PParams$.
 
 \begin{note}
-  I think it makes sense to have Value have two constructors, Value and Coin.
+  \textbf{What creation slots should Shelley era UTxOs have?}
+  It is not yet clear whether we will follow the approach of making the creation
+  slot of every Shelley-era UTxO entry the first slot of Goguen. It is possible
+  to look through all the blocks and add the correct one, but not clear if
+  necessary. The other option is to allow both types out outputs, some without
+  the creation slot.
 \end{note}
 
+
+\begin{note}
+  \textbf{How to make this function readable?}
+  What's better notation to use to make the $\fun{toGoguen}$ function readable?
+\end{note}
 %%
 %% Figure - Shelley to Goguen Transition
 %%
@@ -137,7 +147,7 @@ type as $\PParams$.
   %
   \begin{align*}
       & \fun{mkUTxO} ~\in~ \Slot \to \ShelleyUTxO  \to \UTxO  \\
-      & \fun{mkUTxO}~s~\var{utxo} ~=~ \{~ \var{txin} \mapsto ((a,\fun{toValue}~c),s) ~\vert~
+      & \fun{mkUTxO}~s~\var{utxo} ~=~ \{~ \var{txin} \mapsto ((a,c),s) ~\vert~
       \var{txin} \mapsto \var{(a,c)}\in ~\var{utxo}~\} \\
       & \text{make UTxO Goguen}
       \nextdef
@@ -146,7 +156,8 @@ type as $\PParams$.
       v_7, v_8, v_8, v_{10}), v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
       & ~~ = ((v_1, v_2, v_3, (v_4, v_5, (\fun{mkUTxO}~s_{last}~\var{utxo}, v_6),
        \var{pp}\cup \mathsf{ivPP}),
-      v_7, v_8, v_8, v_{10}), v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
+      v_7, v_8, v_8, v_{10}), \\
+      & v_{11}, v_{12}, v_{13}, v_{14}, v_{15}, v_{16}, s_{last}) \\
       & \text{transform Shelley chain state to Goguen state}
   \end{align*}
   \caption{Shelley to Goguen State Transtition}
@@ -155,7 +166,10 @@ type as $\PParams$.
 
 Block creaters should be able to apply the transformation in Figure
 \ref{fig:functions:to-shelley} to make any Shelley-era transactions
-processable in the Goguen era.
+processable in the Goguen era. Here we give the type of the
+transaction transformation function, but use accessor functions to
+represent the changes that must be made to the original $tx \in \ShelleyTx$
+to transform it into the corresponding Goguen transaction $tx' \in \GoguenTx$.
 
 \begin{figure}[htb]
   \emph{Functions}
@@ -165,17 +179,20 @@ processable in the Goguen era.
       \var{txin} \in \var{ins}~\} \\
       & \text{transform Shelley inputs into Goguen inputs}
       \nextdef
-      & \fun{mkOuts} ~\in~ (\Ix \mapsto \ShelleyTxOut) \to (\Ix \mapsto \TxOut) \\
-      & \fun{mkOuts}~\var{outs} ~=~ \{~ \var{ix} \mapsto \var{(a,\fun{toValue}~c)} ~\vert~
-      \var{ix} \mapsto \var{(a,c)} \in \var{outs}~\} \\
-      & \text{transform Shelley inputs into Goguen inputs}
+      & \fun{toGoguenTx} ~\in~  \ShelleyTx \to \GoguenTx \\
+      & \text{transform a Shelley transaction into a Goguen transaction as follows:}
       \nextdef
-      & \fun{toGoguenTx} ~\in~ \Slot \to  \ShelleyTx \to \GoguenTx \\
-      & \fun{toGoguenTx}~s_{last}~((\var{ins}, \var{outs},
-      v_3, v_4, v_5, v_6, v_7), \wcard) ~=~\\
-      &~~((\fun{mkIns}~\var{ins}, \fun{mkOuts}~\var{outs}, v_3, \epsilon,
-      (0, 0), v_4, (s_{last}, v_5), v_6, v_7, \Nothing, \Nothing), \wcard) \\
-      & \text{transform a Shelley transaction into a Goguen transaction}
+      & ~~\fun{txinputs}~{txb'} ~=~ \fun{mkIns}~(\fun{txins}~{txb}) \\
+      & ~~\fun{forge}~{txb'} ~= ~\epsilon \\
+      & ~~\fun{txexunits}~{txb'} ~= ~(0,0) \\
+      & ~~\fun{txfst}~{txb'} ~= ~0 \\
+      & ~~\fun{ppHash}~{txb'} ~= ~\Nothing \\
+      & ~~\fun{ppHash}~{txb'} ~= ~\Nothing \\~\\
+      & ~~\fun{txwits}~{tx'} ~= ~(\epsilon,\emptyset,\emptyset,\epsilon) \\
+      & ~~\fun{txvaltag}~{tx'} ~= ~\Yes \\
+      &~~      \where \\
+      & ~~~~~~~ \var{txb}~=~\txbody{tx} \\
+      & ~~~~~~~ \var{txb'}~=~\txbody{tx'}
   \end{align*}
   \caption{Shelley to Goguen Transaction Interpretation}
   \label{fig:functions:to-shelley}
