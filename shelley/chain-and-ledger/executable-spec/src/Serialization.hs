@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -14,6 +15,7 @@ module Serialization
   , decodeList
   , decodeMapContents
   , encodeFoldable
+  , groupRecord
   )
 where
 
@@ -52,7 +54,7 @@ decodeRecord getRecordSize decode = do
     Nothing -> void decodeBreakOr -- TODO: make this give better errors
   pure x
 
-groupRecord :: (ToCBORGroup a, FromCBORGroup a) => Decoder s a
+groupRecord :: forall a s. (ToCBORGroup a, FromCBORGroup a) => Decoder s a
 groupRecord = decodeRecord (fromIntegral . toInteger . listLen) fromCBORGroup
 
 newtype CBORMap a b = CBORMap { unwrapCBORMap :: Map a b }

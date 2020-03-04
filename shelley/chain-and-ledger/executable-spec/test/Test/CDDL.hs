@@ -26,15 +26,20 @@ import           System.Process.ByteString.Lazy
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import           ConcreteCryptoTypes (AVUpdate, DCert, MultiSig, PPUpdate, Tx, TxBody, TxIn, TxOut,
-                     Update)
+import           ConcreteCryptoTypes
 import           MetaData (MetaData)
 import           Updates (PParamsUpdate)
+import Serialization
 
 cddlTests :: TestTree
 cddlTests = withResource combinedCDDL (const (pure ())) $ \cddl ->
   testGroup "CDDL roundtrip tests" $
-    [ cddlTest @TxBody        30 "transaction_body"
+    [
+      cddlGroupTest @BHeader       30 "header"
+    , cddlGroupTest @BHBody 30 "header_body"
+    , cddlGroupTest @OCert  30 "operational_cert"
+    , cddlGroupTest @Addr   20 "address"
+    , cddlTest @TxBody        30 "transaction_body" 
     , cddlTest @TxOut         30 "transaction_output"
     , cddlTest @DCert         30 "delegation_certificate"
     , cddlTest @TxIn          30 "transaction_input"
@@ -46,12 +51,7 @@ cddlTests = withResource combinedCDDL (const (pure ())) $ \cddl ->
     , cddlTest @PParamsUpdate 30 "protocol_param_update"
     , cddlTest @PParamsUpdate 30 "protocol_param_update"
     , cddlTest @Tx            30 "transaction"
-    -- TODO reenable tests below
-    --, cddlTest @Block         30 "block"
-    --, cddlTest @BHeader       30 "header"
-    --, cddlTest @BHBody 30 "header_body"
-    --, cddlTest @OCert  30 "operational_cert"
-    --, cddlTest @Addr   20 "address"
+    , cddlTest @Block         30 "block"
     ] <*> pure cddl
 
 combinedCDDL :: IO BSL.ByteString
@@ -85,6 +85,34 @@ cddlTest n entryName cddlRes = testCase
           ]
     let reencoded = serialize decoded
     verifyConforming reencoded cddl
+
+cddlGroupTest
+  :: forall a. (ToCBORGroup a, FromCBORGroup a)
+  => Int
+  -> BSL.ByteString
+  -> IO BSL.ByteString
+  -> TestTree
+cddlGroupTest n entryName cddlRes = testCase
+  ("cddl roundtrip " <> show (typeRep (Proxy @a)))
+  $ do
+  basecddl <- cddlRes
+  let cddl = "output = [" <> entryName <> "]\n" <> basecddl
+  examples <- Char8.lines <$> generateCBORDiagStdIn n cddl :: IO [BSL.ByteString]
+  let n = length examples
+      decoder = groupRecord :: forall s. Decoder s a
+  forM_ examples $ \exampleDiag -> do
+    exampleBytes <- diagToBytes exampleDiag
+    decoded <- case decodeFullDecoder "CBORGroup" decoder exampleBytes of
+      Right x -> pure x
+      Left e  ->
+        assertFailure $ Prelude.unlines
+          [ "Failed to deserialize"
+          , "Error: " <> show e
+          , "Data: " <> Char8.unpack exampleDiag
+          ]
+    let reencoded = serializeEncoding $ encodeListLen 1 <> toCBORGroup decoded
+    verifyConforming reencoded cddl
+
 
 data StdErr = StdErr Prelude.String BSL.ByteString
 
