@@ -46,6 +46,8 @@ import           Updates (Update, emptyUpdate, updateNull)
 
 import           Serialization (CBORGroup (..), CBORMap (..), CborSeq (..), FromCBORGroup (..),
                      ToCBORGroup (..), mapHelper)
+import           Scripts
+import           Value
 
 -- |The delegation of one stake key to another.
 data Delegation crypto = Delegation
@@ -116,72 +118,37 @@ data Ptr
 
 instance NoUnexpectedThunks Ptr
 
--- | A simple language for expressing conditions under which it is valid to
--- withdraw from a normal UTxO payment address or to use a stake address.
---
--- The use case is for expressing multi-signature payment addresses and
--- multi-signature stake addresses. These can be combined arbitrarily using
--- logical operations:
---
--- * multi-way \"and\";
--- * multi-way \"or\";
--- * multi-way \"N of M\".
---
--- This makes it easy to express multi-signature addresses, and provides an
--- extension point to express other validity conditions, e.g., as needed for
--- locking funds used with lightning.
---
-data MultiSig crypto =
-       -- | Require the redeeming transaction be witnessed by the spending key
-       --   corresponding to the given verification key hash.
-       RequireSignature   (AnyKeyHash crypto)
-
-       -- | Require all the sub-terms to be satisfied.
-     | RequireAllOf      [MultiSig crypto]
-
-       -- | Require any one of the sub-terms to be satisfied.
-     | RequireAnyOf      [MultiSig crypto]
-
-       -- | Require M of the given sub-terms to be satisfied.
-     | RequireMOf    Int [MultiSig crypto]
-  deriving (Show, Eq, Ord, Generic)
-
-instance NoUnexpectedThunks (MultiSig crypto)
-
--- | Magic number representing the tag of the native multi-signature script
--- language. For each script language included, a new tag is chosen and the tag
--- is included in the script hash for a script.
-nativeMultiSigTag :: Word8
-nativeMultiSigTag = 0
-
-newtype ScriptHash crypto =
-  ScriptHash (Hash (HASH crypto) (Script crypto))
-  deriving (Show, Eq, Ord, NoUnexpectedThunks)
-
-data Script crypto = MultiSigScript (MultiSig crypto)
-                  -- constructors for new languages go here
-                   -- e.g | PlutusScriptV1 ScriptPLC
-  deriving (Show, Eq, Ord, Generic)
-
-deriving instance Crypto crypto => ToCBOR (ScriptHash crypto)
-deriving instance Crypto crypto => FromCBOR (ScriptHash crypto)
-
--- | Count nodes and leaves of multi signature script
-countMSigNodes :: MultiSig crypto -> Int
-countMSigNodes (RequireSignature _) = 1
-countMSigNodes (RequireAllOf msigs) = 1 + sum (map countMSigNodes msigs)
-countMSigNodes (RequireAnyOf msigs) = 1 + sum (map countMSigNodes msigs)
-countMSigNodes (RequireMOf _ msigs) = 1 + sum (map countMSigNodes msigs)
 
 newtype Wdrl crypto = Wdrl { unWdrl :: Map (RewardAcnt crypto) Coin }
   deriving (Show, Eq, Generic, NoUnexpectedThunks)
 
-instance Crypto crypto => ToCBOR (Wdrl crypto) where
-  toCBOR = toCBOR . CBORMap . unWdrl
+-- | types of things scripts can be used to validate
+data ScrTypes = InputTag | ForgeTag | CertTag | WdrlTag
+  deriving (Show, Eq, Ord, Generic)
 
-instance Crypto crypto => FromCBOR (Wdrl crypto) where
-  fromCBOR = Wdrl . unwrapCBORMap <$> fromCBOR
+instance NoUnexpectedThunks ScrTypes
 
+-- | pointer to the thing the redeemer is for
+data RdmrPtr = RdmrPtr
+  {   scrType :: ScrTypes
+    , rix      :: Ix }
+  deriving (Show, Eq, Ord, Generic)
+
+instance NoUnexpectedThunks RdmrPtr
+
+-- | data structure of indexed redeemers
+data Rdmrs = Rdmrs (Map RdmrPtr Data)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NoUnexpectedThunks Rdmrs
+
+-- | hash of the indexed redeemer structure in the Tx
+newtype RdmrsHash crypto
+  = RdmrsHash { _rdmrsHash :: Hash (HASH crypto) Rdmrs }
+  deriving (Show, Eq, Ord, NoUnexpectedThunks)
+
+deriving instance Crypto crypto => ToCBOR (RdmrsHash crypto)
+deriving instance Crypto crypto => FromCBOR (RdmrsHash crypto)
 
 -- |A unique ID of a transaction, which is computable from the transaction.
 newtype TxId crypto
@@ -191,16 +158,24 @@ newtype TxId crypto
 deriving instance Crypto crypto => ToCBOR (TxId crypto)
 deriving instance Crypto crypto => FromCBOR (TxId crypto)
 
--- |The input of a UTxO.
+-- |The input of a Tx.
 data TxIn crypto
-  = TxIn (TxId crypto) Natural -- TODO use our own Natural type
+  = TxIn (TxId crypto) Natural IsFee -- TODO use our own Natural type
   deriving (Show, Eq, Generic, Ord)
 
 instance NoUnexpectedThunks (TxIn crypto)
 
--- |The output of a UTxO.
+-- |The output of a Tx.
+data TxOutP crypto = TxOutP (Addr crypto) (Value crypto) (DataHash crypto)
+  deriving (Show, Eq, Generic, Ord)
+
+instance NoUnexpectedThunks (TxOutP crypto)
+
+-- |
+
+-- |The output of a Tx.
 data TxOut crypto
-  = TxOut (Addr crypto) Coin
+  = TxOutND (Addr crypto) Coin | TxOutPT (TxOutP crypto) HasDV
   deriving (Show, Eq, Generic, Ord)
 
 instance NoUnexpectedThunks (TxOut crypto)
@@ -259,6 +234,7 @@ data TxBody crypto
       , _txfee    :: Coin
       , _ttl      :: SlotNo
       , _txUpdate :: Update crypto
+
       , _mdHash   :: Maybe (MetaDataHash crypto)
       } deriving (Show, Eq, Generic)
 
@@ -297,6 +273,55 @@ newtype StakePools crypto =
 
 
 -- CBOR
+
+instance FromCBOR RdmrPtr
+ where
+   fromCBOR = do
+     enforceSize "RdmrPtr" 2
+     a <- fromCBOR
+     b <- fromCBOR
+     pure $ RdmrPtr a b
+
+
+instance ToCBOR RdmrPtr
+ where
+   toCBOR rp =
+     encodeListLen 2
+       <> toCBOR (scrType rp)
+       <> toCBOR (rix rp)
+
+
+instance Crypto crypto => ToCBOR (Wdrl crypto) where
+  toCBOR = toCBOR . CBORMap . unWdrl
+
+instance Crypto crypto => FromCBOR (Wdrl crypto) where
+  fromCBOR = Wdrl . unwrapCBORMap <$> fromCBOR
+
+instance ToCBOR Rdmrs where
+  toCBOR = toCBOR . CBORMap . getRMs
+    where
+      getRMs (Rdmrs rm) = rm
+
+instance FromCBOR Rdmrs where
+  fromCBOR = Rdmrs . unwrapCBORMap <$> fromCBOR
+
+instance ToCBOR ScrTypes
+ where
+   toCBOR = \case
+     InputTag -> toCBOR (0 :: Word8)
+     ForgeTag -> toCBOR (1 :: Word8)
+     CertTag  -> toCBOR (2 :: Word8)
+     WdrlTag  -> toCBOR (3 :: Word8)
+
+instance FromCBOR ScrTypes
+ where
+  fromCBOR = do
+    decodeWord >>= \case
+      0 -> pure InputTag
+      1 -> pure ForgeTag
+      2 -> pure CertTag
+      3 -> pure WdrlTag
+      k -> invalidKey k
 
 instance
   (Crypto crypto)
@@ -397,10 +422,11 @@ instance
   (Typeable crypto, Crypto crypto)
   => ToCBOR (TxIn crypto)
  where
-  toCBOR (TxIn txId index) =
+  toCBOR (TxIn txId index isf) =
     encodeListLen 2
       <> toCBOR txId
       <> toCBOR (fromIntegral index :: Word64)
+      <> toCBOR isf
 
 instance (Crypto crypto) =>
   FromCBOR (TxIn crypto) where
@@ -408,8 +434,10 @@ instance (Crypto crypto) =>
     enforceSize "TxIn" 2
     a <- fromCBOR
     (b :: Word64) <- fromCBOR
-    pure $ TxIn a (fromInteger $ toInteger b)
+    c <- fromCBOR
+    pure $ TxIn a (fromInteger $ toInteger b) c
 
+-- | TODO turn into TxOutND or TxOutPT
 instance
   (Typeable crypto, Crypto crypto)
   => ToCBOR (TxOut crypto)
@@ -427,6 +455,26 @@ instance (Crypto crypto) =>
     (b :: Word64) <- fromCBOR
     matchSize "TxOut" ((fromIntegral . toInteger . listLen) addr + 1) n
     pure $ TxOut addr (Coin $ toInteger b)
+
+instance
+  (Typeable crypto, Crypto crypto)
+  => ToCBOR (TxOutP crypto)
+ where
+  toCBOR (TxOutP addr val h) =
+    encodeListLen (listLen addr + 2)
+      <> toCBORGroup addr
+      <> toCBOR val
+      <> toCBOR h
+
+instance (Crypto crypto) =>
+  FromCBOR (TxOutP crypto) where
+  fromCBOR = do
+    n <- decodeListLen
+    addr <- fromCBORGroup
+    val <- fromCBOR
+    h <- fromCBOR
+    matchSize "TxOutP" ((fromIntegral . toInteger . listLen) addr + 1) n
+    pure $ TxOutP addr val h
 
 instance
   Crypto crypto
@@ -463,7 +511,7 @@ instance
   => ToCBOR (TxBody crypto)
  where
   toCBOR txbody =
-    let l = catMaybes 
+    let l = catMaybes
           [ encodeMapElement 0 $ _inputs txbody
           , encodeMapElement 1 $ CborSeq $ _outputs txbody
           , encodeMapElement 2 $ _txfee txbody
@@ -477,9 +525,9 @@ instance
     in encodeMapLen n <> fold l
     where
       encodeMapElement ix x = Just (encodeWord ix <> toCBOR x)
-      encodeMapElementUnless condition ix x = 
-        if condition x 
-          then Nothing 
+      encodeMapElementUnless condition ix x =
+        if condition x
+          then Nothing
           else encodeMapElement ix x
 
 instance
@@ -521,44 +569,6 @@ instance
           , _txUpdate = emptyUpdate
           , _mdHash   = Nothing
           }
-
-instance (Crypto crypto) =>
-  ToCBOR (MultiSig crypto) where
-  toCBOR (RequireSignature hk) =
-    encodeListLen 2 <> encodeWord 0 <> toCBOR hk
-  toCBOR (RequireAllOf msigs) =
-    encodeListLen 2 <> encodeWord 1 <> toCBOR msigs
-  toCBOR (RequireAnyOf msigs) =
-    encodeListLen 2 <> encodeWord 2 <> toCBOR msigs
-  toCBOR (RequireMOf m msigs) =
-    encodeListLen 3 <> encodeWord 3 <> toCBOR m <> toCBOR msigs
-
-instance (Crypto crypto) =>
-  FromCBOR (MultiSig crypto) where
-  fromCBOR = do
-    n <- decodeListLen
-    decodeWord >>= \case
-      0 -> matchSize "RequireSignature" 2 n >> (RequireSignature . AnyKeyHash) <$> fromCBOR
-      1 -> matchSize "RequireAllOf" 2 n >> RequireAllOf <$> fromCBOR
-      2 -> matchSize "RequireAnyOf" 2 n >> RequireAnyOf <$> fromCBOR
-      3 -> do
-        matchSize "RequireMOf" 3 n
-        m     <- fromCBOR
-        msigs <- fromCBOR
-        pure $ RequireMOf m msigs
-      k -> invalidKey k
-
-instance (Crypto crypto) =>
-  ToCBOR (Script crypto) where
-  toCBOR (MultiSigScript msig) =
-    toCBOR nativeMultiSigTag <> toCBOR msig
-
-instance (Crypto crypto) =>
-  FromCBOR (Script crypto) where
-  fromCBOR = do
-    decodeWord >>= \case
-      0 -> MultiSigScript <$> fromCBOR
-      k -> invalidKey k
 
 instance (Typeable crypto, Crypto crypto)
   => ToCBORGroup (Credential crypto) where
