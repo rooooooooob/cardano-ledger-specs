@@ -66,12 +66,12 @@ import           Delegation.Certificates (DCert (..), StakePools (..), dvalue, r
 
 -- |The unspent transaction outputs.
 newtype UTxO crypto
-  = UTxO (Map (TxIn crypto) (TxOut crypto))
+  = UTxO (Map (UTxOIn crypto) (UTxOOut crypto))
   deriving (Show, Eq, Ord, ToCBOR, FromCBOR, NoUnexpectedThunks)
 
 instance Relation (UTxO crypto) where
-  type Domain (UTxO crypto) = TxIn crypto
-  type Range (UTxO crypto)  = TxOut crypto
+  type Domain (UTxO crypto) = UTxOIn crypto
+  type Range (UTxO crypto)  = UTxOOut crypto
 
   singleton k v = UTxO $ Map.singleton k v
 

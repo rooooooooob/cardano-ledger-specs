@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | This module contains just the type of protocol parameters.
 module PParams
@@ -34,11 +35,17 @@ module PParams
   , activeSlotLog
   ) where
 
-import           Cardano.Binary (FromCBOR (..), ToCBOR (..), encodeListLen, enforceSize)
+import           Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR), decodeListLen, decodeWord,
+                     encodeListLen, enforceSize, matchSize)
+import           BaseTypes (invalidKey)
 import           Cardano.Prelude (NoUnexpectedThunks (..))
 import           GHC.Generics (Generic)
 import           Numeric.Natural (Natural)
-
+import           Cardano.Ledger.Shelley.Crypto
+import           Cardano.Crypto.Hash (Hash, hash)
+import           Data.Word (Word8)
+import           Data.Set (Set)
+import           Data.Map.Strict (Map, insert, empty, findWithDefault)
 import           BaseTypes (FixedPoint, Nonce (NeutralNonce), UnitInterval, fpPrecision, interval0,
                      intervalValue)
 import           Coin (Coin (..))
@@ -47,6 +54,8 @@ import           Slot (EpochNo (..))
 import qualified NonIntegral (ln')
 
 import           Lens.Micro.TH (makeLenses)
+import           CostModel
+import           Scripts
 
 -- | Protocol parameters
 data PParams = PParams
@@ -90,6 +99,14 @@ data PParams = PParams
   , _extraEntropy    :: Nonce
     -- | Protocol version
   , _protocolVersion :: (Natural, Natural)
+    -- | cost models for each language that uses them
+  , _costmdls        :: CostModels
+    -- | Prices of execution units
+  , _prices          :: Prices
+    -- | exunits limit per transaction
+  , _maxTxExUnits    :: ExUnits
+    -- | exunits limit per block
+  , _maxBlockExUnits :: ExUnits
   } deriving (Show, Eq, Generic)
 
 data ActiveSlotCoeff =
@@ -129,6 +146,37 @@ activeSlotVal = unActiveSlotVal
 activeSlotLog :: ActiveSlotCoeff -> FixedPoint
 activeSlotLog f = (fromIntegral $ unActiveSlotLog f) / fpPrecision
 
+-- hash of the parameters relevant to a language
+data PPHashItems crypto =
+  -- PLCV1 only needs hashes of the cost model for this language
+  PLCV1PPHash CostMod
+  -- hashes of parameters for other languages go here
+  deriving (Show, Eq, Generic)
+
+data PPHash crypto = PPHash (Hash (HASH crypto) (Map Language (PPHashItems crypto)))
+  deriving (Show, Eq, Generic)
+
+instance NoUnexpectedThunks (PPHash crypto)
+
+instance NoUnexpectedThunks (PPHashItems crypto)
+
+-- | helper function adds the items needed to hash for each language in a set
+mkMap :: (Map Language CostMod)
+  -> (Map Language (PPHashItems crypto))
+  -> Language -> (Map Language (PPHashItems crypto))
+mkMap cm oldm k
+  | k == Language plcV1 = insert k (PLCV1PPHash (findWithDefault defaultModel k cm)) oldm
+
+-- | hash parameters relevant to languages in the set
+hashLanguagePP :: Crypto crypto
+  => PParams
+  -> (Set Language)
+  -> Maybe (PPHash crypto)
+hashLanguagePP pp ls
+    | null ls       = Nothing
+    | not $ null ls = Just $ PPHash (hash (foldl (mkMap cm) Data.Map.Strict.empty ls))
+        where (CostModels cm) = _costmdls pp
+
 instance NoUnexpectedThunks PParams
 
 instance ToCBOR PParams
@@ -154,8 +202,12 @@ instance ToCBOR PParams
     , _d               = d'
     , _extraEntropy    = extraEntropy'
     , _protocolVersion = protocolVersion'
+    , _costmdls        = costmdls'
+    , _prices          = prices'
+    , _maxTxExUnits    = maxTxExUnits'
+    , _maxBlockExUnits = maxBlockExUnits'
     }) =
-      encodeListLen 20
+      encodeListLen 24
         <> toCBOR minfeeA'
         <> toCBOR minfeeB'
         <> toCBOR maxBBSize'
@@ -176,13 +228,21 @@ instance ToCBOR PParams
         <> toCBOR d'
         <> toCBOR extraEntropy'
         <> toCBOR protocolVersion'
+        <> toCBOR costmdls'
+        <> toCBOR prices'
+        <> toCBOR maxTxExUnits'
+        <> toCBOR maxBlockExUnits'
 
 instance FromCBOR PParams
  where
   fromCBOR = do
-    enforceSize "PParams" 20
+    enforceSize "PParams" 24
     PParams
       <$> fromCBOR
+      <*> fromCBOR
+      <*> fromCBOR
+      <*> fromCBOR
+      <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
@@ -229,4 +289,33 @@ emptyPParams =
      , _d = interval0
      , _extraEntropy = NeutralNonce
      , _protocolVersion = (0, 0)
+     , _costmdls = defaultModels
+     , _prices = defaultPrices
+     , _maxTxExUnits = defaultUnits
+     , _maxBlockExUnits = defaultUnits
      }
+
+-- | CBOR
+
+-- | numbers correspond to language tags (plcV1 = 1)
+instance
+  (Crypto crypto)
+  => ToCBOR (PPHashItems crypto)
+ where
+   toCBOR = \case
+     PLCV1PPHash cm ->
+           encodeListLen 2
+           <> toCBOR (1 :: Word8)
+           <> toCBOR cm
+-- new languages go here
+
+instance
+  (Crypto crypto)
+  => FromCBOR (PPHashItems crypto)
+ where
+  fromCBOR = do
+    n <- decodeListLen
+    decodeWord >>= \case
+      0 -> matchSize "PLCV1PPHash" 2 n >> PLCV1PPHash <$> fromCBOR
+-- new languages go here
+      k -> invalidKey k
