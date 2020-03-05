@@ -97,11 +97,17 @@ data Script crypto = MultiSigScript (MultiSig crypto)
                    -- e.g | PlutusScriptV1 ScriptPLC
   deriving (Show, Eq, Ord, Generic)
 
+instance NoUnexpectedThunks (Script crypto)
+
 deriving instance Crypto crypto => ToCBOR (ScriptHash crypto)
 deriving instance Crypto crypto => FromCBOR (ScriptHash crypto)
 
 newtype DataHash crypto = DataHash (Hash (HASH crypto) Data)
   deriving (Show, Eq, Generic, NoUnexpectedThunks, Ord)
+
+
+deriving instance Crypto crypto => ToCBOR (DataHash crypto)
+deriving instance Crypto crypto => FromCBOR (DataHash crypto)
 
 -- | Count nodes and leaves of multi signature script
 countMSigNodes :: MultiSig crypto -> Int

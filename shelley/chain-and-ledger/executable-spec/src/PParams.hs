@@ -7,6 +7,7 @@
 -- | This module contains just the type of protocol parameters.
 module PParams
   ( PParams(..)
+  , PPHash
   , emptyPParams
   -- lenses
   , minfeeA
@@ -166,6 +167,7 @@ mkMap :: (Map Language CostMod)
   -> Language -> (Map Language (PPHashItems crypto))
 mkMap cm oldm k
   | k == Language plcV1 = insert k (PLCV1PPHash (findWithDefault defaultModel k cm)) oldm
+  | otherwise           = oldm
 
 -- | hash parameters relevant to languages in the set
 hashLanguagePP :: Crypto crypto
@@ -173,8 +175,8 @@ hashLanguagePP :: Crypto crypto
   -> (Set Language)
   -> Maybe (PPHash crypto)
 hashLanguagePP pp ls
-    | null ls       = Nothing
-    | not $ null ls = Just $ PPHash (hash (foldl (mkMap cm) Data.Map.Strict.empty ls))
+    | null ls   = Nothing
+    | otherwise = Just $ PPHash (hash (foldl (mkMap cm) Data.Map.Strict.empty ls))
         where (CostModels cm) = _costmdls pp
 
 instance NoUnexpectedThunks PParams
