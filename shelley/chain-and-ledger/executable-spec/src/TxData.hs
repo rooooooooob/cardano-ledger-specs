@@ -46,7 +46,11 @@ import           Slot (EpochNo (..), SlotNo (..))
 import           Updates (Update, emptyUpdate, updateNull)
 
 import           Serialization (CBORGroup (..), CBORMap (..), CborSeq (..), FromCBORGroup (..),
+<<<<<<< HEAD
                      ToCBORGroup (..), mapHelper, decodeList, decodeMapContents, encodeFoldable)
+=======
+                     ToCBORGroup (..), mapHelper)
+>>>>>>> 48feacf7b283c660d903cb3fd77016134206115d
 import           Scripts
 import           Value
 
