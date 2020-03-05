@@ -47,6 +47,7 @@ import           Updates (Update, emptyUpdate, updateNull)
 
 import           Serialization (CBORGroup (..), CBORMap (..), CborSeq (..), FromCBORGroup (..),
                      ToCBORGroup (..), mapHelper, decodeList, decodeMapContents, encodeFoldable)
+
 import           Scripts
 import           Value
 
